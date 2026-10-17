@@ -97,7 +97,9 @@ await wallet.writeContract({ address: cfg.contract, abi: [{ type: "function", na
 
 ## 6. 我这边的边界
 
-- `shared/` 我一个字没改（契约照旧 v1.0.0），只补了后端和合约。
+- `shared/API.md` 和 `shared/contract.mjs`（契约本身）**一个字没改**，仍是 v1.0.0。
+  `shared/` 目录里另外动了两处：新增 `check-frontend.mjs`（工具），修正 `mock/server.mjs`
+  的 `minPaid/spread` 口径（见第 8 节 F-mock）。
 - 前端代码我一行没动。上面所有验证都是 curl / 脚本层，**UI 长什么样我没看过**，视觉效果仍然由你负责。
 - `frontend/shared` 是指向 `../shared` 的软链接，价格曲线和字段校验都是同一份文件，不存在两边算法不一致的问题。
 
@@ -116,3 +118,50 @@ await wallet.writeContract({ address: cfg.contract, abi: [{ type: "function", na
 - `frontend/js/api.js` 的 `api.stream()`：`es.onerror` 里直接 `es.close()` 并**永久降级为轮询**。EventSource 在弱网下每次重连都会触发 `onerror`，所以大屏只要有一下抖动，整场都变成 1s 轮询（没有 `trade`/`stampede` 实时事件，只有 tick）。建议改成「先让 EventSource 自己重连，连续失败 3 次再降级」。
 - `/content?buyer=` 只凭地址放行，`shared/API.md` 第 60 行已经把它写成明示取舍（「防君子」）。要真防，得加钱包签名挑战，那要改契约，得双方一起动手。
 - `/api/signals` 每次请求对每条信号各读一次合约（N+1）。现在 3–5 条无所谓，真到几十条要加按区块号的缓存。
+
+## 8. 第三轮：前端 × 后端 逐接口联调
+
+**详细清单和可照抄的改法在 [`docs/FE-INTEGRATION-REVIEW.md`](./FE-INTEGRATION-REVIEW.md)**，
+这里只列结论。新增了一个工具，对 mock 和真后端都能跑：
+
+```bash
+node shared/check-frontend.mjs http://127.0.0.1:4030     # 或 npm run check:frontend
+node shared/check-frontend.mjs http://127.0.0.1:4031 --with-publish
+```
+
+它验的是「前端代码真正读的那些字段」——`check-contract.mjs` 验的是「符合 API.md」，
+两者不是一回事：字段名对、类型不对（比如 `buyers` 成了字符串），契约校验照样通过，
+前端却会算错。修完真后端 54 项全过，mock 49 项全过。
+
+**后端修的（你们不用管）：**
+
+1. `POST /api/signals` 之前要求 `previewText` 至少 1 字，而 `publish.html` 的输入框没有
+   `required`、mock 也允许空 —— 不填摘要就 400。已放宽为可空。
+2. zod 的英文原文会直接显示在发布页上（`Required`、`String must contain at most 60
+   character(s)`）。已全部翻成中文。
+3. **`/receipt` 没有链上兜底**：`/content` 有 `accessOf()` 兜底、`/receipt` 没有，
+   实测付款确认后有 **1.61 秒**「正文能读、收据 404」。前端 `buy()` 拿到正文立刻
+   `showReceipt()` → 抛错 → 收据页不出现。已补齐兜底，窗口降到 0.00s。
+4. mock 的 `minPaid` 把免费领取（价格 0）算进去了 → 大屏走 `∞` 分支，而真后端只统计
+   付费成交，真链上永远不会有 `0.000000`。mock 已改成同口径。**你那边看到的 `∞`
+   分支从此在两边都是死代码**，如果那个效果是刻意要的，得让后端把 `minPaid` 的口径
+   改成含领取（改契约语义，双方定）。
+5. `reset-state` 之前不清 `deployments.json`：部署失败时旧地址会留下来，本地链
+   chainId 都是 31337，`assertNetwork` 拦不住，服务会带着「链上并不存在的合约」正常
+   启动，所有接口集体 502。已一并清理。
+6. `/api/config` 现在显式返回 `mock: false`（之前省略）。`demo-local.sh` 里那句
+   「端口上是 mock」的判断也跟着改成精确匹配 `"mock":true`。
+
+**前端要改的 6 条**（见 `FE-INTEGRATION-REVIEW.md`，按严重度排）：
+
+| # | 位置 | 问题 |
+|---|---|---|
+| F1 | `js/wallet.js:17,20` | 钱包地址只在模块变量里，**买完刷新页面就"没买过"** |
+| F2 | `live.html:77,82,110` | 提前公开后倒计时继续走、**终局卡不出现** |
+| F3 | `live.html:63,108` | SSE `trade` 用 `trades.length` 覆盖买家数 |
+| F4 | `live.html:53` | 成交不按 `rank` 去重，feed 重复、终局人数虚高 |
+| F5 | `js/api.js:75` | `onerror` 一次就永久降级轮询，实时事件全丢 |
+| F6 | `js/wallet.js:42` | 本地链 `blockExplorerUrls: [""]`，钱包加网络失败 |
+
+F1 和 F2 直接影响现场演示，建议优先。
+

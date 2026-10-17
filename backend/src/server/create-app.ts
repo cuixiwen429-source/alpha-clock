@@ -56,7 +56,10 @@ const tradeView = (trade: Trade) => ({
 
 const publishSchema = z.object({
   title: z.string().trim().min(1).max(60),
-  previewText: z.string().trim().min(1).max(140),
+  // 摘要允许留空：契约 Signal.previewText 是普通 string，mock 也允许空，
+  // publish.html 的输入框没有 required。后端卡 min(1) 会让"不填摘要就发布"
+  // 在真后端 400、在 mock 成功 —— 联调时最难查的那类差异。
+  previewText: z.string().trim().max(140).default(""),
   body: z.string().min(1),
   basePriceMicro: z.string().regex(/^\d+$/),
   floorPriceMicro: z.string().regex(/^\d+$/),
@@ -65,6 +68,45 @@ const publishSchema = z.object({
   txHash: z.string().regex(/^0x[0-9a-fA-F]{64}$/).optional(),
   source: z.string().max(500).optional(),
 });
+
+const FIELD_LABELS: Record<string, string> = {
+  title: "标题",
+  previewText: "摘要",
+  body: "正文",
+  basePriceMicro: "初始价格",
+  floorPriceMicro: "最低价",
+  halfLife: "半衰期",
+  attestPublicSource: "来源声明",
+  txHash: "交易哈希",
+};
+
+/**
+ * zod 的默认 message 是英文，而 publish.html 把 message 原样显示给用户
+ * （`document.getElementById("err").textContent = err.message`），
+ * 于是现场看到的是 "Required" / "Invalid literal value, expected true"。
+ * 这里统一翻成人话，前端不用再维护一份字段名映射。
+ */
+function publishErrorMessage(error: z.ZodError): string {
+  const issue = error.issues[0];
+  if (!issue) return "发布参数不合法";
+  const key = String(issue.path[0] ?? "");
+  const label = FIELD_LABELS[key] ?? key ?? "参数";
+  switch (issue.code) {
+    case "invalid_type":
+      return issue.received === "undefined" ? `缺少${label}` : `${label}格式不正确`;
+    case "too_big":
+      return `${label}最多 ${issue.maximum} 个字符`;
+    case "too_small":
+      if (issue.minimum === 1) return `${label}不能为空`;
+      return issue.inclusive === false ? `${label}必须大于 ${issue.minimum}` : `${label}不能小于 ${issue.minimum}`;
+    case "invalid_literal":
+      return "必须勾选「本内容源自公开信息」";
+    case "invalid_string":
+      return `${label}格式不正确`;
+    default:
+      return `${label}不合法`;
+  }
+}
 
 interface AppContext {
   gateway: AlphaGateway;
@@ -320,6 +362,10 @@ export function createApp(ctx: AppContext) {
       contract: ctx.gateway.alpha,
       usdc: ctx.gateway.deployments.usdc,
       x402: x402.enabled,
+      // 显式给 false 而不是省略：前端靠 cfg.mock 决定"走钱包"还是"走 /__mock/buy"，
+      // 省略时读到的是 undefined，虽然结果一样，但排查"我现在连的是哪个后端"时
+      // 需要这个字段能直接看出来。
+      mock: false,
     });
   });
 
@@ -344,7 +390,7 @@ export function createApp(ctx: AppContext) {
 
   app.post("/api/signals", route(async (req, res) => {
     const parsed = publishSchema.safeParse(req.body);
-    if (!parsed.success) throw new ApiError(400, "BAD_PARAMS", parsed.error.issues[0]?.message ?? "发布参数不合法");
+    if (!parsed.success) throw new ApiError(400, "BAD_PARAMS", publishErrorMessage(parsed.error));
     const input = parsed.data;
     const basePrice = BigInt(input.basePriceMicro);
     const floorPrice = BigInt(input.floorPriceMicro);
@@ -491,8 +537,27 @@ export function createApp(ctx: AppContext) {
     const signal = await requireSignal(ctx, id);
     const content = ctx.contents.get(id);
     if (!content) throw new ApiError(404, "NOT_FOUND", "正文不存在");
-    const trade = ctx.indexer.findTrade(id, address);
-    if (!trade) throw new ApiError(404, "NOT_FOUND", "没有该地址的访问记录");
+    let trade = ctx.indexer.findTrade(id, address);
+    if (!trade) {
+      // 索引器 1s 轮询，而链上访问权一确认就能读。前端买完是
+      // 「buy() → 立刻要收据」，两者之间有 1–2 秒的空窗（实测 1.61s）：
+      // /content 有 accessOf 兜底所以先 200，/receipt 没有，于是收据 404，
+      // s.html 的 showReceipt() 整个抛错 —— 用户看到"钱付了，收据打不开"。
+      // 这里补上和 /content 完全一致的兜底。
+      const access = await ctx.gateway.accessOf(id, address);
+      if (access.at === 0) throw new ApiError(404, "NOT_FOUND", "没有该地址的访问记录");
+      trade = {
+        rank: ctx.indexer.stats(id).trades.length + 1,
+        buyer: address,
+        label: address.slice(2, 6),
+        priceMicro: access.price,
+        elapsed: Math.max(0, access.at - signal.publishedAt),
+        at: access.at,
+        channel: access.price === 0n ? "free" : "onchain",
+        txHash: null,
+        blockNumber: null,
+      };
+    }
     const first = ctx.indexer.stats(id).trades[0]?.priceMicro ?? trade.priceMicro;
     const multiple = trade.priceMicro === 0n ? "∞" : (Number((first * 100n) / trade.priceMicro) / 100).toFixed(2);
     const payload = `${signal.id}|${address.toLowerCase()}|${fmtUsdc(trade.priceMicro)}|${trade.rank}`;

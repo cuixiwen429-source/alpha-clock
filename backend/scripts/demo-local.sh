@@ -79,7 +79,8 @@ curl -s "http://127.0.0.1:$PORT/health" 2>/dev/null | grep -q '"ok"' || { tail -
 # /health 谁都会答「ok」。真正的判据是：答话的那个后端，合约地址必须是刚部署的这个。
 # （同端口上如果跑着前端用的 mock，它也会答 ok，但合约地址是 0x…a1c0）
 CONFIG=$(curl -s "http://127.0.0.1:$PORT/api/config")
-echo "$CONFIG" | grep -q '"mock"' && die "端口 ${PORT} 上是 mock 后端，先停掉 npm run mock（它和真后端抢同一个端口）"
+# 真后端现在也显式返回 "mock": false，所以只能匹配 true
+echo "$CONFIG" | grep -q '"mock":true' && die "端口 ${PORT} 上是 mock 后端，先停掉 npm run mock（它和真后端抢同一个端口）"
 echo "$CONFIG" | grep -qi "$ALPHA" || { echo "$CONFIG"; die "端口 ${PORT} 上的后端不是刚部署的合约，可能被别的进程占了"; }
 ok "API      http://127.0.0.1:${PORT}"
 ok "大屏/购买页：静态服务加 ?api=http://127.0.0.1:${PORT}（如 live.html?id=1&api=…）"

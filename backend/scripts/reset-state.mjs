@@ -9,6 +9,12 @@
  *                           算到新链的 #1 头上，白送访问权。
  *   .runtime/quotes.json    报价。amount 和 payTo 都是旧合约、旧发布者的。
  *   events.ndjson           发布审计日志，同理。
+ *   contracts/deployments.json  部署结果。部署脚本会重写它，但如果这次部署
+ *                           失败（RPC 没起、余额不够），旧地址会留下来 ——
+ *                           本地链的 chainId 都是 31337，assertNetwork 拦不住，
+ *                           服务会带着一个"链上并不存在"的合约地址正常启动，
+ *                           所有读合约的接口集体 502。删掉它，让失败暴露成
+ *                           配置层那句「请先 forge script」。
  *
  *   node scripts/reset-state.mjs
  */
@@ -17,7 +23,7 @@ import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const BACKEND = resolve(dirname(fileURLToPath(import.meta.url)), "..");
-const targets = ["content.json", "events.ndjson", ".runtime"];
+const targets = ["content.json", "events.ndjson", ".runtime", "contracts/deployments.json"];
 let removed = 0;
 
 for (const target of targets) {
