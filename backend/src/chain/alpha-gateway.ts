@@ -1,6 +1,7 @@
 import {
   createPublicClient,
   createWalletClient,
+  fallback,
   http,
   parseEventLogs,
   zeroAddress,
@@ -22,6 +23,46 @@ const RECEIPT_TIMEOUT_MS = (() => {
   return Number.isFinite(raw) && raw > 0 ? raw : 90_000;
 })();
 
+/**
+ * RPC 韧性参数。
+ *
+ * 公共节点（尤其 Monad 官方 testnet-rpc.monad.xyz）在并发下会直接
+ * ECONNRESET 断连：一次失败的 eth_call 就会让 /api/signals 整个变成 502。
+ * 所以在 transport 层统一做三件事：
+ *   1. 单次请求超时，避免连接被吊死；
+ *   2. 失败按指数退避重试（viem 内置 retryCount）；
+ *   3. 主节点连续失败时自动切备用节点（fallback transport）。
+ * 备用节点：MONAD_RPC_FALLBACKS（逗号分隔）> 内置默认列表。
+ */
+const RPC_RETRY_COUNT = (() => {
+  const raw = Number(process.env.RPC_RETRY ?? 4);
+  return Number.isFinite(raw) && raw >= 0 ? raw : 4;
+})();
+
+const RPC_TIMEOUT_MS = (() => {
+  const raw = Number(process.env.RPC_TIMEOUT_MS ?? 15_000);
+  return Number.isFinite(raw) && raw > 0 ? raw : 15_000;
+})();
+
+/** 只在这些网络上兜底换节点；本地 anvil 没有公共节点可换。 */
+const DEFAULT_RPC_FALLBACKS: Record<string, string[]> = {
+  "monad-testnet": ["https://10143.rpc.thirdweb.com", "https://rpc.ankr.com/monad_testnet"],
+};
+
+function transportFor(url: string) {
+  return http(url, { retryCount: RPC_RETRY_COUNT, retryDelay: 300, timeout: RPC_TIMEOUT_MS });
+}
+
+function rpcTransport(net: NetConfig) {
+  const envList = (process.env.MONAD_RPC_FALLBACKS ?? "")
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean);
+  const extra = envList.length > 0 ? envList : (DEFAULT_RPC_FALLBACKS[net.key] ?? []);
+  const urls = [net.rpcUrl, ...extra.filter((u) => u !== net.rpcUrl)];
+  return urls.length === 1 ? transportFor(urls[0]!) : fallback(urls.map(transportFor), { rank: false });
+}
+
 export class AlphaGateway {
   readonly net: NetConfig;
   readonly deployments: Deployments;
@@ -32,7 +73,7 @@ export class AlphaGateway {
     this.net = getNetwork();
     this.deployments = getDeployments();
     this.alpha = this.deployments.alphaClock;
-    this.publicClient = createPublicClient({ transport: http(this.net.rpcUrl) });
+    this.publicClient = createPublicClient({ transport: rpcTransport(this.net) });
   }
 
   async assertNetwork() {
