@@ -18,7 +18,7 @@ npm run check                   # 类型 + 单测 + 契约（不需要链）
 npm run serve                   # 自动读取 .env
 ```
 
-默认监听 `http://127.0.0.1:4030`。前端可通过 `?api=http://<后端IP>:4030` 联调。
+默认监听 `0.0.0.0:4030`（可用 `HOST` / `PORT` 覆盖）。本机访问 `http://127.0.0.1:4030`；前端可用 `?api=http://<内网IP>:4030` 让同事的手机直接联调。
 
 `.env` 由 `src/env.ts` 在入口最前面加载，`npm run serve/seed/buy/deploy:*` 都不需要再手动 `source .env`；已有的环境变量优先，所以测试里 `PORT=4398` 仍然压过 `.env`。
 
@@ -33,6 +33,8 @@ npm run buy 1 1          # 用 anvil 第 1 个账户买 #1（余额不足会自�
 ```
 
 `npm run deploy:local` 会通过 `scripts/foundry.mjs` 读 `.env` 并补 `~/.foundry/bin` 到 PATH，所以 Foundry 装在默认位置时不必手动改 PATH；`deployments.json` 里会写入 `deploymentBlock`，索引器重启后能补全历史。
+
+`contracts/deployments.json` 和 `content.json` 都是运行产物，**不进 git**：它们分别随部署和发布被重写，提交上去只会把某人本机的 anvil 地址带给别人。新克隆的仓库里它们不存在是正常的，按上面的顺序跑一遍就有。前端不要在本地读 `deployments.json`，合约地址一律走 `/api/config` 下发。
 
 ## 分层
 

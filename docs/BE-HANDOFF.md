@@ -16,6 +16,7 @@
 | `openNow` → 免费 → `claimFree` | ✅ | `status` 从 `LIVE` 变 `OPEN`，claims=1 |
 | 进程重启后聚合恢复 | ✅ | 重启后 buyers/claims/revenue 一字不差 |
 | `shared/check-contract.mjs` | ✅ | **14/14**（对真链后端跑的，不是 fixture） |
+| 干净 clone 后 `npm ci && npm run check` | ✅ | 无 `.env`、无 `deployments.json` 也能过（CI 的 backend job 就是这么跑的） |
 | x402 真金白银结算 | ⚠️ 未跑 | 需要 Monad 测试网 + 真实 facilitator，本地只验了 402 响应头形态 |
 
 ## 2. 怎么接到真后端
@@ -45,7 +46,7 @@ cd backend && npm run demo          # 或 bash scripts/demo-local.sh 5 12
 
 1. **`POST /api/signals` 的 `attestPublicSource` 必须是 `true`**（布尔，不是字符串）。zod 是 `literal(true)`，传 `"true"` 会 400。
 2. **不传 `txHash` = 后端代发**，此时链上 `publisher` 是平台钱包（`PRIVATE_KEY`），不是用户钱包，发布者分成也归平台。要保留用户身份就得让前端钱包先发 `publish()`，再把 `txHash` 传上来——后端会从回执里解析 `Published` 事件拿 id，并校验 `contentHash == keccak256(body)`，对不上直接报错。
-3. **`publish()` 现在吃的是 `contentHash`（bytes32），不是 `contentURI`**。合约已经改过了，前端如果手里有旧 ABI 请重新拉。
+3. **`publish()` 现在吃的是 `contentHash`（bytes32），不是 `contentURI`**。`frontend/js/wallet.js` 里的 `ALPHA_ABI` 只有 `buy`，买这条链路是对的、不用动；只有当你决定接「钱包直发 `publish()`」时才需要补上 v1 的 `publish` 片段（见第 5 节）。
 4. **价格归零后 `/content` 返回 `409 FREE_ALREADY`，不是 200**——必须再调 `POST /api/signals/:id/claim` 拿正文。两者都返回同一个 `Content` 结构，前端可以统一处理。
 5. **`/quote` 的有效期是 10 秒，但报价记录保留 10 分钟**。所以签名慢一点不会失败，别在前端做 10 秒倒计时强制刷新，反而会把锁到的低价换掉。
 
@@ -57,10 +58,42 @@ cd backend && npm run demo          # 或 bash scripts/demo-local.sh 5 12
 
 结构永远是 `{ error: { code, message } }`，`code` 是机器可读那个。
 
-## 5. 需要你确认的两件事
+## 5. 两件需要你决定的事（都不阻塞现在能跑的部分）
 
-1. **发布页的「钱包直发 `publish()`」要不要接**？现在 `publish.html` 头部注释里写的是「待后端定索引方案后再接」——索引方案已就位（`Published` 事件 + `contentHash` 校验），只差前端用 v1 ABI 发交易并把 `txHash` 传上来。
-2. **x402 走真钱还是纯演示**？如果要上台演示 x402，需要提前在 Monad 测试网部署 + 拿测试 USDC + 确认 facilitator 可用；本地 anvil 的 facilitator 是自建的，只能验流程不能验真结算。
+**① 发布页要不要「钱包直发 `publish()`」？**
+
+现在 `publish.html` 是 POST 给后端、由平台钱包代发。代发的代价：链上 `publisher` 是平台地址，发布者分成也归平台，页面上那个「我发布的」身份只是数据库层面的一句话。要保留用户身份，前端钱包先发这笔交易、再把 `txHash` 传给后端即可：
+
+```js
+// 钱包直发（viem 已从 esm.sh 动态加载，和 wallet.js 一样的方式）
+const PUBLISH_ABI = [{
+  type: "function", name: "publish", stateMutability: "nonpayable",
+  inputs: [
+    { name: "title", type: "string" }, { name: "previewURI", type: "string" },
+    { name: "contentHash", type: "bytes32" },
+    { name: "basePrice", type: "uint128" }, { name: "floorPrice", type: "uint128" },
+    { name: "halfLife", type: "uint32" },
+  ],
+  outputs: [{ name: "id", type: "uint256" }],
+}];
+// contentHash = keccak256(toBytes(body))，USDC 是 6 位小数，$10 → 10_000_000n
+```
+
+然后 `POST /api/signals` 带上 `txHash`。后端会从回执里解析 `Published` 事件取 id，并校验 `contentHash === keccak256(body)`，对不上直接 400——所以正文必须和链上哈希一致，前端不要做任何 trim。
+
+**② 免费领取要不要落链上？**
+
+`/claim` 是后端本地记账（`.runtime/free-claims.ndjson`），立刻能拿到正文，演示不受影响。但合约里那个 `claimFree()` 只有**领取人自己的钱包**能发（访问权记在 `msg.sender` 上），后端代发等于记到平台头上。想让「免费领取」在链上留痕，就在调 `/claim` 之前加一笔：
+
+```js
+await wallet.writeContract({ address: cfg.contract, abi: [{ type: "function", name: "claimFree", stateMutability: "nonpayable", inputs: [{ name: "id", type: "uint256" }] }], functionName: "claimFree", args: [BigInt(signalId)] });
+```
+
+后端索引器同时监听 `Claimed` 事件和本地记账，两边都走 `recordFreeClaim` 的去重逻辑，不会重复计数。**不做也不影响**，只是链上看不到这次领取。
+
+顺带一句：`/api/config` 已经下发 `contract` / `usdc` / `chainId` / `rpcUrl` / `explorer`，前端别写死地址；`contracts/deployments.json` 现在不进 git 了，本地也读不到。
+
+**③ x402 走真钱还是纯演示？** 本地只验了 402 响应头的形态（金额、`accepts`、`X-PAYMENT` 解析），没跑过真结算。要上台演示真结算，得提前在 Monad 测试网部署 + 拿测试 USDC + 确认 facilitator 可用；否则建议台上只讲这层设计，不放实时扣款。
 
 ## 6. 我这边的边界
 
