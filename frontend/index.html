@@ -12,16 +12,24 @@
   <p class="dim">后端：<code id="base"></code> <span id="mode"></span></p>
   <ul id="list"></ul>
   <p><a href="publish.html">发布台</a></p>
-  <p class="dim">切换后端：在任意页面地址后加 <code>?api=http://主机:4030</code>（会记住），<code>?api=reset</code> 恢复同源。</p>
+  <p>
+    <a href="index.html?api=http://127.0.0.1:4031">连本机真后端</a>
+    · <a href="index.html?api=reset">回到 mock</a>
+  </p>
+  <p class="dim">真后端默认在 4031（anvil），mock 在 4030。点一次会记住，购买页和大屏不用再带参数。<code>?api=reset</code> 清掉记忆。</p>
 </main>
 <script type="module">
 import { api } from "./js/api.js";
+import { parseUsdc } from "./shared/curve.mjs";
+import { fmtPrice } from "./js/price.js";
+
+const priceLabel = (raw) => (Number(raw) === 0 ? "免费" : "$" + fmtPrice(parseUsdc(raw)));
 document.getElementById("base").textContent = api.base;
 try {
   const cfg = await api.config();
   document.getElementById("mode").textContent = cfg.mock ? "（MOCK）" : `（${cfg.network}）`;
   document.getElementById("list").innerHTML = (await api.signals())
-    .map((s) => `<li>#${s.id} ${s.title} · $${s.price} · <a href="s.html?id=${s.id}">购买页</a> · <a href="live.html?id=${s.id}">大屏</a></li>`)
+    .map((s) => `<li>#${s.id} ${s.title} · ${priceLabel(s.price)} · <a href="s.html?id=${s.id}">购买页</a> · <a href="live.html?id=${s.id}">大屏</a></li>`)
     .join("");
 } catch (e) {
   document.getElementById("mode").textContent = "连接失败：" + e.message;

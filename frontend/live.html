@@ -11,17 +11,30 @@
 <header><span class="brand">半衰期</span><span class="dim" id="net">NETWORK —</span></header>
 <h1 id="title">—</h1>
 <div class="row">
-  <div><div id="price" class="price big">$ —</div><div class="dim" id="cadence"></div></div>
+  <div>
+    <canvas id="halfie-big" width="220" height="220" aria-hidden="true"></canvas>
+    <div id="price" class="price big"><span class="unit">$</span><span id="pnum">—</span></div>
+    <div class="dim" id="cadence"></div>
+  </div>
   <div><div class="k">已有</div><div id="buyers" class="v">0</div><div class="k">人知道</div></div>
   <div><div class="k">还剩</div><div id="left" class="v">—</div></div>
   <div><div class="k">最高</div><div id="max" class="v">—</div><div class="k">价差</div><div id="spread" class="v">—</div></div>
 </div>
 <svg id="chart" viewBox="0 0 1000 300" preserveAspectRatio="none" aria-label="价格曲线与成交点"></svg>
+<div class="factions" id="factions" aria-label="阵营分布">
+  <div class="faction bolt"><canvas width="28" height="28"></canvas><span class="n" id="n-bolt">0</span></div>
+  <div class="faction rush"><canvas width="28" height="28"></canvas><span class="n" id="n-rush">0</span></div>
+  <div class="faction hoot"><canvas width="28" height="28"></canvas><span class="n" id="n-hoot">0</span></div>
+  <div class="faction lazlo"><canvas width="28" height="28"></canvas><span class="n" id="n-lazlo">0</span></div>
+</div>
 <ol id="feed" class="feed" aria-live="polite"></ol>
 <section id="final" hidden>
+  <div class="score-title">HIGH SCORE · FREE FOR ALL</div>
   <h2>这一轮，<b id="f-n"></b> 个人买了同一句话</h2>
-  <p>第 1 个人 <b id="f-first"></b></p>
-  <p>第 <span id="f-n2"></span> 个人 <b id="f-last"></b></p>
+  <ol class="scoreboard">
+    <li><span>最高</span><span id="f-max">—</span></li>
+    <li><span>最低</span><span id="f-min">—</span></li>
+  </ol>
   <p>相差 <b id="f-mult"></b> 倍</p>
   <p class="dim">这句话，一个字都没变</p>
 </section>
@@ -29,68 +42,136 @@
 
 <script type="module">
 import { api, syncClock, serverNow, toCurveSig } from "./js/api.js";
-import { priceAt, freeAt, sampleCurve, fmtUsdc, parseUsdc } from "./shared/curve.mjs";
+import { priceAt, freeAt, sampleCurve, parseUsdc } from "./shared/curve.mjs";
+import { fmtPrice, paintDigits } from "./js/price.js";
+import { mountHalfie, stepsRemainingFor } from "./js/halfie.js";
+import { loadSprite } from "./js/sprites.js";
+import { factionOf, factionCounts, FACTIONS } from "./js/factions.js";
+const money = (micro) => "$" + fmtPrice(micro);
 
 const id = Number(new URLSearchParams(location.search).get("id") || 1);
 const $ = (s) => document.getElementById(s);
 const W = 1000, H = 300;
-let sig, trades = [], finalShown = false;
+let sig, trades = [], finalShown = false, openedAt = null;
+const knownRanks = new Set();
+
+const halfieBig = mountHalfie($("halfie-big"), { size: 220 });
+let halfieBigWasFree = false;
 
 function xy(elapsed, priceMicro) {
   const span = sig.halfLife * 8, max = Number(sig.basePrice);
   return [(elapsed / span) * W, H - (Number(priceMicro) / max) * (H - 10)];
 }
 
+/** 阶梯折线：priceAt() 本质是 32 档阶梯定价，画平滑曲线是对真实数据的美化失真。
+ *  这里把采样点两两之间插入一个"先垂直降再水平走"的中继点，呈现真正的台阶。 */
+function stepPath(points) {
+  let d = `M${points[0][0]},${points[0][1]}`;
+  for (let i = 1; i < points.length; i++) {
+    const [px] = points[i - 1], [x, y] = points[i];
+    d += ` L${x},${points[i - 1][1]} L${x},${y}`;
+  }
+  return d;
+}
+
 function drawChart() {
-  const { times, prices } = sampleCurve(sig, 200);
-  const line = times.map((t, i) => xy(t, prices[i]).join(",")).join(" ");
+  const { times, prices } = sampleCurve(sig, 96); // 阶梯图不需要高密度采样，32 档/半衰期本身就是离散的
+  const points = times.map((t, i) => xy(t, prices[i]));
   const dots = trades.filter((t) => t.channel !== "free")
-    .map((t) => { const [x, y] = xy(t.elapsed, parseUsdc(t.price)); return `<circle cx="${x}" cy="${y}" r="5" class="dot" />`; }).join("");
+    .map((t) => { const [x, y] = xy(t.elapsed, parseUsdc(t.price)); return `<rect x="${x - 4}" y="${y - 4}" width="8" height="8" class="dot" />`; }).join("");
   const [nx] = xy(serverNow() - sig.publishedAt, 0);
-  $("chart").innerHTML = `<polyline points="${line}" class="curve" /><line x1="${nx}" x2="${nx}" y1="0" y2="${H}" class="now" />${dots}`;
+  $("chart").innerHTML = `<path d="${stepPath(points)}" class="curve" fill="none" /><line x1="${nx}" x2="${nx}" y1="0" y2="${H}" class="now" />${dots}`;
+}
+
+/** 四个阵营图标只需要画一次（静态 sprite），计数随成交实时刷新 */
+async function paintFactionIcons() {
+  for (const key of Object.keys(FACTIONS)) {
+    const canvas = document.querySelector(`.faction.${key} canvas`);
+    const ctx = canvas.getContext("2d");
+    ctx.imageSmoothingEnabled = false; // CSS 的 image-rendering:pixelated 只管缩放显示，canvas 内部 drawImage 插值要单独关掉
+    ctx.drawImage(await loadSprite(FACTIONS[key].sprite), 0, 0, canvas.width, canvas.height);
+  }
+}
+
+function renderFactionCounts() {
+  const counts = factionCounts(trades, sig.halfLife);
+  for (const key of Object.keys(FACTIONS)) $(`n-${key}`).textContent = counts[key];
 }
 
 function addTrade(t) {
+  if (t.rank != null && knownRanks.has(t.rank)) return false;
+  if (t.rank != null) knownRanks.add(t.rank);
   trades.push(t);
   const li = document.createElement("li");
-  li.textContent = `${t.label} ${t.channel === "free" ? "领取" : "买入"} $${t.price}`;
+  li.textContent = `${t.label}  ${t.channel === "free" ? "领取" : "买入"}  ${money(parseUsdc(t.price))}`;
   $("feed").prepend(li);
   while ($("feed").children.length > 12) $("feed").lastChild.remove();
+  renderFactionCounts();
+  return true;
 }
+
+let lastSnapshot = null; // showFinal() 用这份服务端聚合数据算总数/倍数，不依赖本地 trades 的长度——
+                          // trades 只是 live.recent 的本地累积，recent 按契约只给最近 50 条，
+                          // 大屏如果是信号发布一段时间后才打开，本地 trades 从一开始就是不完整的历史
 
 function applySnapshot(d) {
   syncClock(d.serverTime);
+  lastSnapshot = d;
+  if (Number.isInteger(d.freeAt)) openedAt = d.freeAt;
+  if (d.forcedOpen) sig.forcedOpen = true;
   $("buyers").textContent = d.buyers + d.claims;
-  $("max").textContent = d.maxPaid ? "$" + d.maxPaid : "—";
+  $("max").textContent = d.maxPaid ? money(parseUsdc(d.maxPaid)) : "—";
   $("spread").textContent = d.spread ? d.spread + "×" : d.minPaid === "0.000000" ? "∞" : "—";
-  if (d.recent.length > trades.length) {
-    const known = new Set(trades.map((t) => t.rank));
-    d.recent.slice().reverse().filter((t) => !known.has(t.rank)).forEach(addTrade);
-  }
+  d.recent.slice().reverse().forEach(addTrade);
 }
 
 function render() {
   const t = serverNow();
   const p = priceAt(sig, t);
-  $("price").textContent = p === 0n ? "现在免费" : "$ " + fmtUsdc(p);
-  $("price").classList.toggle("free", p === 0n);
-  const left = Math.max(0, Math.ceil(freeAt(sig) - t));
+  const isFree = p === 0n;
+  $("price").classList.toggle("free", isFree);
+  $("price").querySelector(".unit").style.display = isFree ? "none" : "";
+  if (isFree) {
+    $("pnum").dataset.prev = "";
+    $("pnum").textContent = "免费";
+  } else {
+    paintDigits($("pnum"), fmtPrice(p));
+  }
+  const free = openedAt ?? freeAt(sig);
+  const left = Math.max(0, Math.ceil(free - t));
   $("left").textContent = `${Math.floor(left / 60)}:${String(left % 60).padStart(2, "0")}`;
   document.body.classList.toggle("last-minute", p > 0n && left <= 60);
   document.body.classList.toggle("is-free", p === 0n);
   drawChart();
-  if (p === 0n && !finalShown && t - freeAt(sig) > 20) showFinal();
+
+  // Halfie 归零的那一刻立即炸裂重生，不等 20 秒后的终局卡——
+  // 炸裂动画本身就是"价格到 0→永久公开"这个状态转换最强的视觉信号
+  if (isFree && !halfieBigWasFree) { halfieBig.burstTo(0); halfieBigWasFree = true; }
+  else if (!isFree) { halfieBigWasFree = false; halfieBig.render(stepsRemainingFor(sig, t)); }
+
+  if (p === 0n && !finalShown && t - (openedAt ?? freeAt(sig)) > 20) showFinal();
 }
 
 function showFinal() {
   finalShown = true;
-  const n = trades.length;
-  if (!n) return;
-  const first = trades[0].price, last = trades.at(-1).price;
-  $("f-n").textContent = $("f-n2").textContent = n;
-  $("f-first").textContent = "$ " + first;
-  $("f-last").textContent = "$ " + last;
-  $("f-mult").textContent = parseUsdc(last) === 0n ? "∞" : (Number(parseUsdc(first)) / Number(parseUsdc(last))).toFixed(1);
+  const d = lastSnapshot;
+  if (!d) return;
+
+  // 全部用服务端聚合（buyers+claims、maxPaid、minPaid）——这是全量统计。
+  // 不用本地 trades 数组排名：/api/live/:id 的 recent 只给最近 50 条，归零踩踏时
+  // 这 50 条会被同时发生的免费领取挤满，早期真实成交被挤出窗口之外，本地数据
+  // 排不出真正的最高价（实测复现：135 笔成交，recent 全是最后一波的 $0 领取）。
+  $("f-n").textContent = d.buyers + d.claims;
+  const hasRange = d.maxPaid && d.minPaid;
+  $("f-max").textContent = hasRange ? "$ " + d.maxPaid : "—";
+  $("f-min").textContent = hasRange ? "$ " + d.minPaid : "—";
+  if (hasRange) {
+    const maxM = parseUsdc(d.maxPaid), minM = parseUsdc(d.minPaid);
+    $("f-mult").textContent = minM === 0n ? "∞" : (Number(maxM) / Number(minM)).toFixed(1);
+  } else {
+    $("f-mult").textContent = "—";
+  }
+
   $("final").hidden = false;
 }
 
@@ -100,14 +181,15 @@ async function init() {
   $("title").textContent = meta.title;
   $("net").textContent = `NETWORK ${cfg.network}${cfg.mock ? " · MOCK" : ""}`;
   $("cadence").textContent = `每 ${(sig.halfLife / 32).toFixed(1)} 秒便宜一点`;
-  live.recent.slice().reverse().forEach(addTrade);
+  await paintFactionIcons();
   applySnapshot(live);
 
-  api.stream(id, {
+  // ?static=1 供截图/设计评审用：不建立 SSE，避免页面永不结束加载
+  if (!new URLSearchParams(location.search).has("static")) api.stream(id, {
     tick: (d) => syncClock(d.serverTime),
-    trade: (t) => { addTrade(t); $("buyers").textContent = trades.length; },
-    stampede: (d) => { /* TODO 前端：领取计数器疯狂滚动 */ },
-    opened: () => { if (serverNow() < freeAt(sig)) sig.forcedOpen = true; /* 发布者提前公开。TODO 前端：全屏白闪 */ },
+    trade: (t) => { if (addTrade(t)) $("buyers").textContent = Number($("buyers").textContent) + 1; },
+    stampede: () => { /* 领取计数由 5s 快照里的 claims 校正 */ },
+    opened: (d) => { openedAt = d.at ?? openedAt; sig.forcedOpen = true; },
     snapshot: applySnapshot,
   });
   setInterval(() => api.live(id).then(applySnapshot).catch(() => {}), 5000); // SSE 正常时也定期对账
