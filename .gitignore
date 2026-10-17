@@ -1,0 +1,14 @@
+node_modules
+.env
+.env.*
+!.env.example
+.DS_Store
+
+# foundry
+backend/contracts/out/
+backend/contracts/cache/
+backend/contracts/broadcast/*/31337/
+
+# 运行时
+*.log
+events.ndjson

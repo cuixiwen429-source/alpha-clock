@@ -1,0 +1,121 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>半衰期 · 大屏</title>
+<link rel="stylesheet" href="css/base.css" />
+</head>
+<body class="screen">
+<!-- 骨架页：数据流（SSE + 轮询降级）已接通。动效（抖动/暗红/白闪/终局卡）按 PRD §9.3 + 视觉规范补 -->
+<header><span class="brand">半衰期</span><span class="dim" id="net">NETWORK —</span></header>
+<h1 id="title">—</h1>
+<div class="row">
+  <div><div id="price" class="price big">$ —</div><div class="dim" id="cadence"></div></div>
+  <div><div class="k">已有</div><div id="buyers" class="v">0</div><div class="k">人知道</div></div>
+  <div><div class="k">还剩</div><div id="left" class="v">—</div></div>
+  <div><div class="k">最高</div><div id="max" class="v">—</div><div class="k">价差</div><div id="spread" class="v">—</div></div>
+</div>
+<svg id="chart" viewBox="0 0 1000 300" preserveAspectRatio="none" aria-label="价格曲线与成交点"></svg>
+<ol id="feed" class="feed" aria-live="polite"></ol>
+<section id="final" hidden>
+  <h2>这一轮，<b id="f-n"></b> 个人买了同一句话</h2>
+  <p>第 1 个人 <b id="f-first"></b></p>
+  <p>第 <span id="f-n2"></span> 个人 <b id="f-last"></b></p>
+  <p>相差 <b id="f-mult"></b> 倍</p>
+  <p class="dim">这句话，一个字都没变</p>
+</section>
+<footer class="disclaimer">本页内容为研究观点分享，不构成投资建议。内容将在 8 个半衰期后永久免费公开。</footer>
+
+<script type="module">
+import { api, syncClock, serverNow, toCurveSig } from "./js/api.js";
+import { priceAt, freeAt, sampleCurve, fmtUsdc, parseUsdc } from "./shared/curve.mjs";
+
+const id = Number(new URLSearchParams(location.search).get("id") || 1);
+const $ = (s) => document.getElementById(s);
+const W = 1000, H = 300;
+let sig, trades = [], finalShown = false;
+
+function xy(elapsed, priceMicro) {
+  const span = sig.halfLife * 8, max = Number(sig.basePrice);
+  return [(elapsed / span) * W, H - (Number(priceMicro) / max) * (H - 10)];
+}
+
+function drawChart() {
+  const { times, prices } = sampleCurve(sig, 200);
+  const line = times.map((t, i) => xy(t, prices[i]).join(",")).join(" ");
+  const dots = trades.filter((t) => t.channel !== "free")
+    .map((t) => { const [x, y] = xy(t.elapsed, parseUsdc(t.price)); return `<circle cx="${x}" cy="${y}" r="5" class="dot" />`; }).join("");
+  const [nx] = xy(serverNow() - sig.publishedAt, 0);
+  $("chart").innerHTML = `<polyline points="${line}" class="curve" /><line x1="${nx}" x2="${nx}" y1="0" y2="${H}" class="now" />${dots}`;
+}
+
+function addTrade(t) {
+  trades.push(t);
+  const li = document.createElement("li");
+  li.textContent = `${t.label} ${t.channel === "free" ? "领取" : "买入"} $${t.price}`;
+  $("feed").prepend(li);
+  while ($("feed").children.length > 12) $("feed").lastChild.remove();
+}
+
+function applySnapshot(d) {
+  syncClock(d.serverTime);
+  $("buyers").textContent = d.buyers + d.claims;
+  $("max").textContent = d.maxPaid ? "$" + d.maxPaid : "—";
+  $("spread").textContent = d.spread ? d.spread + "×" : d.minPaid === "0.000000" ? "∞" : "—";
+  if (d.recent.length > trades.length) {
+    const known = new Set(trades.map((t) => t.rank));
+    d.recent.slice().reverse().filter((t) => !known.has(t.rank)).forEach(addTrade);
+  }
+}
+
+function render() {
+  const t = serverNow();
+  const p = priceAt(sig, t);
+  $("price").textContent = p === 0n ? "现在免费" : "$ " + fmtUsdc(p);
+  $("price").classList.toggle("free", p === 0n);
+  const left = Math.max(0, Math.ceil(freeAt(sig) - t));
+  $("left").textContent = `${Math.floor(left / 60)}:${String(left % 60).padStart(2, "0")}`;
+  document.body.classList.toggle("last-minute", p > 0n && left <= 60);
+  document.body.classList.toggle("is-free", p === 0n);
+  drawChart();
+  if (p === 0n && !finalShown && t - freeAt(sig) > 20) showFinal();
+}
+
+function showFinal() {
+  finalShown = true;
+  const n = trades.length;
+  if (!n) return;
+  const first = trades[0].price, last = trades.at(-1).price;
+  $("f-n").textContent = $("f-n2").textContent = n;
+  $("f-first").textContent = "$ " + first;
+  $("f-last").textContent = "$ " + last;
+  $("f-mult").textContent = parseUsdc(last) === 0n ? "∞" : (Number(parseUsdc(first)) / Number(parseUsdc(last))).toFixed(1);
+  $("final").hidden = false;
+}
+
+async function init() {
+  const [meta, live, cfg] = await Promise.all([api.signal(id), api.live(id), api.config()]);
+  sig = toCurveSig(meta);
+  $("title").textContent = meta.title;
+  $("net").textContent = `NETWORK ${cfg.network}${cfg.mock ? " · MOCK" : ""}`;
+  $("cadence").textContent = `每 ${(sig.halfLife / 32).toFixed(1)} 秒便宜一点`;
+  live.recent.slice().reverse().forEach(addTrade);
+  applySnapshot(live);
+
+  api.stream(id, {
+    tick: (d) => syncClock(d.serverTime),
+    trade: (t) => { addTrade(t); $("buyers").textContent = trades.length; },
+    stampede: (d) => { /* TODO 前端：领取计数器疯狂滚动 */ },
+    opened: () => { if (serverNow() < freeAt(sig)) sig.forcedOpen = true; /* 发布者提前公开。TODO 前端：全屏白闪 */ },
+    snapshot: applySnapshot,
+  });
+  setInterval(() => api.live(id).then(applySnapshot).catch(() => {}), 5000); // SSE 正常时也定期对账
+  setInterval(render, 400);
+  render();
+}
+
+init().catch((e) => ($("title").textContent = "加载失败：" + e.message));
+</script>
+</body>
+</html>

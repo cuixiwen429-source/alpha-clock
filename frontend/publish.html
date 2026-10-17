@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>半衰期 · 发布台</title>
+<link rel="stylesheet" href="css/base.css" />
+</head>
+<body>
+<!-- 骨架页：走 POST /api/signals（服务端代发，PRD P1"现场可由脚本代发"）。钱包直发 publish() 待后端定索引方案后再接 -->
+<main>
+  <h1>发布一条信号</h1>
+  <form id="f">
+    <label>标题（≤60 字）<input name="title" maxlength="60" required /></label>
+    <label>免费摘要（≤140 字）<input name="previewText" maxlength="140" /></label>
+    <label>正文<textarea name="body" rows="6" required></textarea></label>
+    <fieldset>
+      <legend>参数预设</legend>
+      <label><input type="radio" name="preset" value="burst" /> 突发：$10 → 30s 半衰期，4 分钟免费</label>
+      <label><input type="radio" name="preset" value="normal" checked /> 常规：$10 → 120s 半衰期，16 分钟免费</label>
+      <label><input type="radio" name="preset" value="deep" /> 深度：$50 → 3600s 半衰期，8 小时免费</label>
+    </fieldset>
+    <label><input type="checkbox" name="attest" required /> 本内容源自公开信息，不含重大非公开信息</label>
+    <button type="submit">发布</button>
+  </form>
+  <p id="out" aria-live="polite"></p>
+  <p id="err" class="err" role="alert"></p>
+</main>
+<script type="module">
+import { api } from "./js/api.js";
+
+// PRD §5.3
+const PRESETS = {
+  burst: { basePriceMicro: "10000000", floorPriceMicro: "0", halfLife: 30 },
+  normal: { basePriceMicro: "10000000", floorPriceMicro: "1000", halfLife: 120 },
+  deep: { basePriceMicro: "50000000", floorPriceMicro: "10000", halfLife: 3600 },
+};
+
+document.getElementById("f").onsubmit = async (e) => {
+  e.preventDefault();
+  const fd = Object.fromEntries(new FormData(e.target));
+  document.getElementById("err").textContent = "";
+  try {
+    const r = await api.publish({ title: fd.title, previewText: fd.previewText, body: fd.body, ...PRESETS[fd.preset], attestPublicSource: true });
+    const url = new URL(`s.html?id=${r.id}`, location.href).href;
+    document.getElementById("out").innerHTML = `已发布 #${r.id}：<a href="${url}">${url}</a> · <a href="live.html?id=${r.id}">打开大屏</a>`;
+  } catch (err) {
+    document.getElementById("err").textContent = err.message;
+  }
+};
+</script>
+</body>
+</html>

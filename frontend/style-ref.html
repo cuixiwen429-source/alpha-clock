@@ -1,0 +1,512 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Alpha Clock · 视觉样张 v1.0</title>
+<style>
+:root{
+  --bg:#08090A; --surface:#101113; --surface-2:#16181B;
+  --hair:rgba(255,255,255,.08); --hair-strong:rgba(255,255,255,.14);
+  --fg:#F2F3F5; --fg-2:#8A8F98; --fg-3:#5C616B;
+  --accent:#C8FF3D;
+  --price-hot:#FFC53D; --price-mid:#D9A63C; --price-cool:#8E939C; --price-dead:#6E747E;
+  --free:#3DDC97; --alert:#FF5C3D;
+  --num:"Geist Mono",ui-monospace,"SF Mono","JetBrains Mono",Menlo,monospace;
+  --ui:"Geist Sans",-apple-system,"PingFang SC","Noto Sans SC",system-ui,sans-serif;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{background:#050506;font-family:var(--ui);-webkit-font-smoothing:antialiased}
+body{padding:40px 40px 120px;color:var(--fg)}
+
+/* ── 展示台外壳（样张专用，不属于产品） ── */
+.meta{max-width:1920px;margin:0 auto 28px;display:flex;align-items:baseline;gap:16px;flex-wrap:wrap}
+.meta h1{font-size:15px;font-weight:600;letter-spacing:-.01em;color:var(--fg)}
+.meta span{font-family:var(--num);font-size:11px;color:var(--fg-3);letter-spacing:.08em;text-transform:uppercase}
+.ctl{margin-left:auto;display:flex;gap:8px}
+.ctl button{
+  font-family:var(--num);font-size:11px;letter-spacing:.06em;text-transform:uppercase;
+  background:transparent;color:var(--fg-2);border:1px solid var(--hair-strong);
+  padding:7px 14px;cursor:pointer;border-radius:0;transition:.15s;
+}
+.ctl button:hover{color:var(--fg);border-color:rgba(255,255,255,.3)}
+.ctl button.on{background:var(--fg);color:#0A0B0C;border-color:var(--fg)}
+
+.stage{max-width:1920px;margin:0 auto}
+.label{
+  font-family:var(--num);font-size:10px;letter-spacing:.18em;text-transform:uppercase;
+  color:var(--fg-3);margin:56px 0 14px;display:flex;align-items:center;gap:12px;
+}
+.label::after{content:"";flex:1;height:1px;background:var(--hair)}
+
+/* 1920×1080 缩放容器 */
+.scr-wrap{width:100%;overflow:hidden}
+.scr{
+  width:1920px;height:1080px;background:var(--bg);position:relative;
+  transform-origin:top left;overflow:hidden;
+}
+
+/* ══════════════ 大屏 ══════════════ */
+.big{padding:64px 64px 36px;height:100%;display:flex;flex-direction:column}
+.eyebrow{
+  display:flex;align-items:center;gap:14px;
+  font-family:var(--num);font-size:13px;font-weight:500;letter-spacing:.16em;
+  text-transform:uppercase;color:var(--fg-2);
+}
+.eyebrow .dot{width:7px;height:7px;background:var(--alert);border-radius:50%;
+  animation:pulse 1.6s ease-in-out infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.25}}
+.eyebrow .right{margin-left:auto;color:var(--fg-3)}
+
+.big h2{
+  font-size:44px;font-weight:500;letter-spacing:-.02em;line-height:1.15;
+  margin-top:44px;max-width:1400px;
+}
+
+.priceRow{display:flex;align-items:flex-start;margin-top:56px;flex:0 0 auto}
+.priceBox{flex:1}
+.price{
+  font-family:var(--num);font-size:148px;font-weight:250;line-height:.86;
+  letter-spacing:-.045em;font-variant-numeric:tabular-nums;
+  color:var(--price-hot);display:flex;align-items:baseline;
+  transition:color .28s linear;
+}
+.price .d{display:inline-block;transition:transform .12s cubic-bezier(.2,.8,.2,1),opacity .12s}
+.price .d.chg{transform:translateY(-3px);opacity:.72}
+.price .d.zero{color:var(--fg-3)}
+.unit{font-family:var(--num);font-size:24px;font-weight:400;color:var(--fg-3);
+  margin-left:18px;letter-spacing:.04em}
+.sub{font-size:16px;color:var(--fg-2);margin-top:22px;font-variant-numeric:tabular-nums}
+
+.kpis{display:flex;flex-direction:column;gap:22px;text-align:right;min-width:220px}
+.kpi .v{font-family:var(--num);font-size:30px;font-weight:300;font-variant-numeric:tabular-nums;letter-spacing:-.02em}
+.kpi .l{font-size:12px;font-weight:500;color:var(--fg-3);margin-top:3px;letter-spacing:.02em}
+
+.chartWrap{flex:1;margin-top:40px;display:flex;flex-direction:column;min-height:0;position:relative}
+svg.chart{width:100%;flex:1;display:block}
+.axis{display:flex;justify-content:space-between;padding-top:10px;
+  font-family:var(--num);font-size:11px;color:var(--fg-3);letter-spacing:.06em}
+
+.qrBox{position:absolute;right:0;top:0;display:flex;align-items:flex-start;gap:14px}
+.qr{width:104px;height:104px;background:#fff;padding:7px;border:1px solid var(--hair-strong)}
+.qr canvas{display:block;width:90px;height:90px}
+.qrNote{font-family:var(--num);font-size:11px;color:var(--fg-3);letter-spacing:.1em;
+  text-transform:uppercase;writing-mode:vertical-rl;padding-bottom:4px}
+
+/* 归零覆盖 */
+.flash{position:absolute;inset:0;background:var(--free);opacity:0;pointer-events:none}
+.flash.go{animation:flash .6s ease-out}
+@keyframes flash{0%{opacity:.18}100%{opacity:0}}
+.freeBanner{
+  margin-top:24px;opacity:0;pointer-events:none;transition:opacity .45s;max-height:0;overflow:hidden;
+}
+.freeBanner.show{opacity:1;max-height:240px}
+.freeBanner .t{font-family:var(--num);font-size:14px;font-weight:500;color:var(--free);
+  letter-spacing:.32em;text-transform:uppercase}
+.freeBanner .n{font-family:var(--num);font-size:84px;font-weight:250;color:var(--free);
+  letter-spacing:-.04em;line-height:1;margin-top:6px;font-variant-numeric:tabular-nums}
+.freeBanner .s{font-size:13px;color:var(--fg-2);margin-top:8px}
+
+/* ══════════════ 手机 + 收据 ══════════════ */
+.phones{display:flex;gap:64px;flex-wrap:wrap;align-items:flex-start}
+.phone{
+  width:375px;height:812px;background:var(--bg);border:1px solid var(--hair-strong);
+  padding:28px 24px;display:flex;flex-direction:column;position:relative;overflow:hidden;
+}
+.p-eyebrow{display:flex;align-items:center;gap:8px;
+  font-family:var(--num);font-size:10px;font-weight:500;letter-spacing:.16em;
+  text-transform:uppercase;color:var(--fg-3)}
+.p-eyebrow .live{color:var(--accent);margin-left:auto;display:flex;align-items:center;gap:5px}
+.p-eyebrow .live i{width:5px;height:5px;background:var(--accent);border-radius:50%;display:block;
+  animation:pulse 1.6s ease-in-out infinite}
+.p-title{font-size:20px;font-weight:500;line-height:1.35;letter-spacing:-.01em;margin-top:22px}
+.p-price{font-family:var(--num);font-size:72px;font-weight:250;letter-spacing:-.045em;
+  line-height:.9;margin-top:34px;font-variant-numeric:tabular-nums;color:var(--price-hot);
+  display:flex;align-items:baseline;transition:color .28s linear}
+.p-price .d{display:inline-block;transition:transform .12s cubic-bezier(.2,.8,.2,1),opacity .12s}
+.p-price .d.chg{transform:translateY(-3px);opacity:.72}
+.p-price .d.zero{color:var(--fg-3)}
+.p-unit{font-family:var(--num);font-size:11px;color:var(--fg-3);margin-top:8px;letter-spacing:.1em}
+.p-sub{font-size:13px;color:var(--fg-2);margin-top:20px;line-height:1.7;font-variant-numeric:tabular-nums}
+.p-btn{
+  margin-top:auto;height:56px;background:var(--accent);color:#0A0B0C;border:0;
+  font-family:var(--ui);font-size:17px;font-weight:600;letter-spacing:-.01em;
+  border-radius:10px;cursor:pointer;transition:.18s;
+}
+.p-btn.free{background:var(--free)}
+.p-btn:active{transform:scale(.985)}
+.p-foot{font-family:var(--num);font-size:12px;color:var(--fg-3);margin-top:14px;
+  display:flex;justify-content:space-between;font-variant-numeric:tabular-nums}
+.p-rule{height:1px;background:var(--hair);margin:20px 0 14px}
+.p-legal{font-size:10px;line-height:1.7;color:var(--fg-3)}
+
+/* 收据 */
+.receipt{
+  width:375px;background:var(--surface);border:1px solid var(--hair-strong);padding:40px 28px;
+}
+.r-kicker{font-family:var(--num);font-size:10px;letter-spacing:.18em;text-transform:uppercase;color:var(--fg-3)}
+.r-title{font-size:22px;font-weight:500;letter-spacing:-.01em;margin-top:10px}
+.r-rule{height:1px;background:var(--hair-strong);margin:24px 0}
+.r-row{display:flex;justify-content:space-between;align-items:baseline;padding:9px 0}
+.r-row .k{font-size:13px;color:var(--fg-2)}
+.r-row .v{font-family:var(--num);font-size:28px;font-weight:300;letter-spacing:-.02em;
+  font-variant-numeric:tabular-nums}
+.r-row .v.sm{font-size:15px;color:var(--fg)}
+.r-quote{font-size:16px;color:var(--fg-2);text-align:center;line-height:1.6;margin-top:4px}
+.r-share{margin-top:26px;width:100%;height:44px;background:transparent;color:var(--fg);
+  border:1px solid var(--hair-strong);font-family:var(--ui);font-size:14px;font-weight:500;
+  cursor:pointer;border-radius:0;transition:.15s}
+.r-share:hover{border-color:rgba(255,255,255,.32)}
+
+/* ══════════════ Token 条 ══════════════ */
+.tokens{max-width:1920px;margin:0 auto;display:flex;gap:2px;flex-wrap:wrap}
+.sw{flex:1;min-width:110px;height:72px;display:flex;flex-direction:column;justify-content:flex-end;
+  padding:10px;font-family:var(--num);font-size:9px;letter-spacing:.06em;
+  border:1px solid var(--hair)}
+.sw b{font-size:10px;font-weight:500;letter-spacing:.04em}
+
+.type-scale{max-width:900px;margin-top:8px}
+.type-scale div{display:flex;align-items:baseline;gap:20px;border-bottom:1px solid var(--hair);padding:14px 0}
+.type-scale .spec{font-family:var(--num);font-size:10px;color:var(--fg-3);width:150px;flex:none}
+</style>
+</head>
+<body>
+
+<div class="meta">
+  <h1>Alpha Clock · 视觉样张</h1>
+  <span>Terminal × Editorial · v1.0</span>
+  <div class="ctl">
+    <button id="btnPause">暂停</button>
+    <button id="btnReset">重播</button>
+    <button id="btnSkip">跳到归零</button>
+  </div>
+</div>
+
+<div class="stage">
+
+<!-- ══════════ 1. 大屏 ══════════ -->
+<div class="label">01 / 大屏 1920×1080（投影）</div>
+<div class="scr-wrap"><div class="scr" id="scr">
+  <div class="flash" id="flash"></div>
+  <div class="big">
+    <div class="eyebrow">
+      <span class="dot"></span>
+      <span>Signal #001</span>
+      <span style="color:var(--fg-3)">·</span>
+      <span>Monad Testnet</span>
+      <span class="right" id="blockNo">Block 4,281,309</span>
+    </div>
+
+    <h2>某地址 12 分钟前把 4.2M USDC<br>转进了一个刚部署的合约</h2>
+
+    <div class="priceRow">
+      <div class="priceBox">
+        <div class="price" id="bigPrice"></div>
+        <div class="sub" id="bigSub">每 3.8 秒便宜一点 · 还剩 16 分 04 秒</div>
+        <div class="freeBanner" id="freeBanner">
+          <div class="t">Now Free</div>
+          <div class="n" id="freeCount">0</div>
+          <div class="s">这个房间，一起把它等到了 0</div>
+        </div>
+      </div>
+      <div class="kpis">
+        <div class="kpi"><div class="v" id="kBuyers">12</div><div class="l">已有多少人知道</div></div>
+        <div class="kpi"><div class="v" id="kMax">9.12</div><div class="l">最高成交</div></div>
+        <div class="kpi"><div class="v" id="kSpread">2.31×</div><div class="l">价差</div></div>
+      </div>
+    </div>
+
+    <div class="chartWrap">
+      <svg class="chart" id="chart" viewBox="0 0 1792 420" preserveAspectRatio="none"></svg>
+      <div class="axis">
+        <span>0s · 发布</span>
+        <span id="axMid">8m</span>
+        <span>16m · 永久免费</span>
+      </div>
+      <div class="qrBox">
+        <div class="qrNote">Scan to join</div>
+        <div class="qr"><canvas id="qr" width="90" height="90"></canvas></div>
+      </div>
+    </div>
+  </div>
+
+  </div>
+</div></div>
+
+<!-- ══════════ 2. 手机 + 收据 ══════════ -->
+<div class="label">02 / 购买页 375 · 收据卡</div>
+<div class="phones">
+
+  <div class="phone">
+    <div class="p-eyebrow">
+      <span>Signal #001</span>
+      <span class="live"><i></i>Live</span>
+    </div>
+    <div class="p-title">某地址 12 分钟前把 4.2M USDC 转进了一个刚部署的合约</div>
+    <div class="p-price" id="phPrice"></div>
+    <div class="p-unit">USDC</div>
+    <div class="p-sub" id="phSub">每 3.8 秒便宜一点<br>16 分 04 秒后免费</div>
+    <button class="p-btn" id="phBtn">现在买 · 10.0000 USDC</button>
+    <div class="p-foot">
+      <span>已有 12 人知道</span>
+      <span>最高 $9.12</span>
+    </div>
+    <div class="p-rule"></div>
+    <div class="p-legal">本页内容为研究观点分享，不构成投资建议。内容将在 8 个半衰期后永久免费公开。</div>
+  </div>
+
+  <div class="receipt">
+    <div class="r-kicker">Receipt · Signal #001</div>
+    <div class="r-title">你是第 41 个知道的</div>
+    <div class="r-rule"></div>
+    <div class="r-row"><span class="k">你付了</span><span class="v">0.6250</span></div>
+    <div class="r-row"><span class="k">第一个人付了</span><span class="v">9.1200</span></div>
+    <div class="r-row"><span class="k">你比 ta 少付</span><span class="v sm">14.6 倍</span></div>
+    <div class="r-row"><span class="k">你晚了</span><span class="v sm">8 分 00 秒</span></div>
+    <div class="r-rule"></div>
+    <div class="r-quote">这句话，一个字都没变</div>
+    <button class="r-share">分享</button>
+  </div>
+
+</div>
+
+<!-- ══════════ 3. Token ══════════ -->
+<div class="label">03 / Token</div>
+<div class="tokens">
+  <div class="sw" style="background:#08090A;border-color:rgba(255,255,255,.14)"><b style="color:#8A8F98">#08090A</b><span style="color:#5C616B">bg</span></div>
+  <div class="sw" style="background:#101113"><b style="color:#8A8F98">#101113</b><span style="color:#5C616B">surface</span></div>
+  <div class="sw" style="background:#FFC53D"><b style="color:#3a2a00">#FFC53D</b><span style="color:#5a4200">hot</span></div>
+  <div class="sw" style="background:#8E939C"><b style="color:#1a1b1d">#8E939C</b><span style="color:#33363b">cool</span></div>
+  <div class="sw" style="background:#C8FF3D"><b style="color:#25320a">#C8FF3D</b><span style="color:#3d4f14">accent</span></div>
+  <div class="sw" style="background:#3DDC97"><b style="color:#06301f">#3DDC97</b><span style="color:#0a4a30">free</span></div>
+  <div class="sw" style="background:#FF5C3D"><b style="color:#3a0f06">#FF5C3D</b><span style="color:#5a1a0c">alert</span></div>
+</div>
+
+<div class="label">04 / 字阶</div>
+<div class="type-scale">
+  <div><span class="spec">148 / 250 / mono</span><span style="font-family:var(--num);font-size:56px;font-weight:250;letter-spacing:-.045em">7.0710</span></div>
+  <div><span class="spec">44 / 500 / ui</span><span style="font-size:32px;font-weight:500;letter-spacing:-.02em">转进了一个刚部署的合约</span></div>
+  <div><span class="spec">30 / 300 / mono</span><span style="font-family:var(--num);font-size:26px;font-weight:300">2.31×</span></div>
+  <div><span class="spec">16 / 400 / ui</span><span style="font-size:16px;color:var(--fg-2)">每 3.8 秒便宜一点</span></div>
+  <div><span class="spec">13 / 500 / mono · 大字距</span><span style="font-family:var(--num);font-size:13px;font-weight:500;letter-spacing:.16em;text-transform:uppercase;color:var(--fg-2)">Signal #001 · Monad Testnet</span></div>
+</div>
+
+</div>
+
+<script>
+/* ───────── 与合约完全一致的价格算法 ─────────
+   price(t) = max(base / 2^floor(t*32/halfLife) * 2^(-(t*32 mod 32)/32), floor)
+   8 个半衰期后归零                                              */
+const SIG = { base: 10, halfLife: 60, floor: 0.000001, freeAt: 480 };
+const FRAC = Array.from({length:32}, (_,i)=> Math.pow(2, -i/32));
+
+function priceAt(el){
+  if (el <= 0) return SIG.base;
+  const steps = Math.floor(el * 32 / SIG.halfLife);
+  if (steps >= 256) return 0;
+  const p = (SIG.base / Math.pow(2, Math.floor(steps/32))) * FRAC[steps % 32];
+  return Math.max(p, SIG.floor);
+}
+function fmt(p){
+  if (p <= 0) return "0.00";
+  if (p >= 1) return p.toFixed(4);
+  return p.toFixed(4);
+}
+/* 颜色随价格失温 —— 本产品的签名动作 */
+function tempColor(p){
+  const r = p / SIG.base;
+  if (p <= 0) return "var(--free)";
+  if (r >= .5) return "var(--price-hot)";
+  if (r >= .2) return "var(--price-mid)";
+  if (r >= .05) return "var(--price-cool)";
+  return "var(--price-dead)";
+}
+/* 按字符渲染，只有变化的那一位抖 */
+function renderPrice(el, prev){
+  const s = fmt(priceAt(el));
+  const prevS = prev || "";
+  return [...s].map((c,i)=>{
+    if (c === ".") return `<span class="d">.</span>`;
+    const isZero = /0/.test(c) && s.replace(/0+$/,"").length <= i;
+    const chg = prevS[i] !== undefined && prevS[i] !== c;
+    return `<span class="d${chg?" chg":""}${isZero?" zero":""}">${c}</span>`;
+  }).join("");
+}
+
+/* ───────── 状态机 ───────── */
+const QS = new URLSearchParams(location.search);
+const MAXEL = 480;
+let elapsed = QS.has("t") ? Math.min(MAXEL, Math.max(0, +QS.get("t"))) : 150;
+let running = true, prevStr = "", claimTimer = null, booted = false;
+
+const $ = id => document.getElementById(id);
+
+function paint(){
+  const p = priceAt(elapsed);
+  const big = $("bigPrice"), ph = $("phPrice");
+  const str = fmt(p);
+  big.innerHTML = renderPrice(elapsed, prevStr);
+  ph.innerHTML = renderPrice(elapsed, prevStr);
+  big.style.color = tempColor(p);
+  ph.style.color = tempColor(p);
+  prevStr = str;
+
+  if (p <= 0){
+    big.innerHTML = `<span class="d">0.00</span>`;
+    ph.innerHTML = `<span class="d">0.00</span>`;
+    big.style.color = "var(--free)";
+    ph.style.color = "var(--free)";
+  }
+
+  const left = Math.max(0, MAXEL - elapsed);
+  const mm = Math.floor(left/60), ss = Math.floor(left%60);
+  $("bigSub").textContent = p<=0
+    ? "现在免费 · 所有人可读"
+    : `每 ${(SIG.halfLife/32).toFixed(1)} 秒便宜一点 · 还剩 ${mm} 分 ${String(ss).padStart(2,"0")} 秒`;
+  $("phSub").innerHTML = p<=0
+    ? "现在免费 · 立即领取"
+    : `每 ${(SIG.halfLife/32).toFixed(1)} 秒便宜一点<br>${mm} 分 ${String(ss).padStart(2,"0")} 秒后免费`;
+
+  const btn = $("phBtn");
+  if (p <= 0){ btn.classList.add("free"); btn.textContent = "现在免费 · 立即领取"; }
+  else { btn.classList.remove("free"); btn.textContent = `现在买 · ${str} USDC`; }
+
+  const buyers = 12 + Math.floor(elapsed/9);
+  $("kBuyers").textContent = buyers;
+
+  drawChart(elapsed, p);
+
+  if (elapsed >= MAXEL && !claimTimer) startStampede();
+}
+
+/* ───────── 曲线 ───────── */
+const W = 1792, H = 420, PAD_T = 12, PAD_B = 8;
+function xOf(t){ return (Math.min(t,MAXEL)/MAXEL) * W; }
+function yOf(p){ const maxP = SIG.base; return PAD_T + (H-PAD_T-PAD_B) - (p/maxP)*(H-PAD_T-PAD_B); }
+
+const BUYS = [4,17,33,52,74,99,128,160,196,238,286,340,400,455];
+
+function drawChart(now, p){
+  const svg = $("chart");
+  let past = [];
+  for (let t=0; t<=now; t+=1) past.push([t, priceAt(t)]);
+  past.push([now, p]);
+  const dPast = past.map((q,i)=>`${i?"L":"M"}${xOf(q[0]).toFixed(1)},${yOf(q[1]).toFixed(1)}`).join(" ");
+
+  // 未来（虚线）
+  let fut = [];
+  for (let t=now; t<=MAXEL; t+=4) fut.push([t, priceAt(t)]);
+  const dFut = fut.map((q,i)=>`${i?"L":"M"}${xOf(q[0]).toFixed(1)},${yOf(q[1]).toFixed(1)}`).join(" ");
+
+  const grid = [0,.25,.5,.75,1].map(f=>{
+    const y = (PAD_T + (H-PAD_T-PAD_B)*f).toFixed(1);
+    return `<line x1="0" y1="${y}" x2="${W}" y2="${y}" stroke="rgba(255,255,255,.06)" stroke-width="1"/>`;
+  }).join("");
+
+  const dots = BUYS.filter(t=>t<=now).map(t=>{
+    const pp = priceAt(t);
+    return `<circle cx="${xOf(t).toFixed(1)}" cy="${yOf(pp).toFixed(1)}" r="4.5" fill="#C8FF3D" opacity=".9"/>`;
+  }).join("");
+
+  const cx = xOf(now), cy = yOf(p);
+  const live = p>0 ? `
+    <circle cx="${cx.toFixed(1)}" cy="${cy.toFixed(1)}" r="11" fill="${tempColor(p)}" opacity=".16"/>
+    <circle cx="${cx.toFixed(1)}" cy="${cy.toFixed(1)}" r="4" fill="${tempColor(p)}"/>
+  ` : "";
+
+  const c = tempColor(p);
+  const area = `<path d="${dPast} L${xOf(now).toFixed(1)},${H} L0,${H} Z" fill="url(#ar)"/>`;
+
+  svg.innerHTML = `
+    <defs>
+      <clipPath id="cp"><rect x="0" y="0" width="${W}" height="${H}"/></clipPath>
+      <linearGradient id="ar" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0%" stop-color="${c}" stop-opacity=".16"/>
+        <stop offset="100%" stop-color="${c}" stop-opacity="0"/>
+      </linearGradient>
+    </defs>
+    <g clip-path="url(#cp)">
+      ${grid}
+      ${area}
+      <path d="${dFut}" fill="none" stroke="rgba(255,255,255,.12)" stroke-width="1.5" stroke-dasharray="3 6"/>
+      <path d="${dPast}" fill="none" stroke="${c}" stroke-width="2.5" stroke-linejoin="round"/>
+      ${dots}
+      ${live}
+    </g>`;
+}
+
+/* ───────── 归零踩踏 ───────── */
+function startStampede(){
+  const f = $("flash"), b = $("freeBanner");
+  if (booted){
+    f.classList.add("go");
+    setTimeout(()=>f.classList.remove("go"), 700);
+  }
+  b.classList.add("show");
+  let n = 0;
+  if (claimTimer) clearInterval(claimTimer);
+  claimTimer = setInterval(()=>{
+    n += Math.floor(Math.random()*7)+2;
+    $("freeCount").textContent = n;
+    if (n > 87){ $("freeCount").textContent = 87; clearInterval(claimTimer); claimTimer=null; }
+  }, 40);
+}
+
+/* ───────── 主循环（400ms，与 Monad 出块一致） ───────── */
+const TICK = 400;
+setInterval(()=>{
+  if (!running) return;
+  elapsed = Math.min(MAXEL, elapsed + TICK/1000 * 4);   // 4× 加速，便于预览
+  paint();
+}, TICK);
+
+$("btnPause").onclick = e => {
+  running = !running;
+  e.target.textContent = running ? "暂停" : "继续";
+  e.target.classList.toggle("on", !running);
+};
+$("btnReset").onclick = () => {
+  elapsed = 0; prevStr = ""; running = true;
+  $("btnPause").textContent = "暂停"; $("btnPause").classList.remove("on");
+  $("freeBanner").classList.remove("show"); $("freeCount").textContent = "0";
+  if (claimTimer){ clearInterval(claimTimer); claimTimer=null; }
+  paint();
+};
+$("btnSkip").onclick = () => { elapsed = MAXEL - 6; paint(); };
+
+/* ───────── 大屏自适应缩放 ───────── */
+function fit(){
+  const wrap = document.querySelector(".scr-wrap");
+  const s = Math.min(1, wrap.clientWidth / 1920);
+  const scr = $("scr");
+  scr.style.transform = `scale(${s})`;
+  wrap.style.height = (1080 * s) + "px";
+}
+addEventListener("resize", fit);
+
+/* ───────── 假二维码（纯装饰，真机用 qrcode 库） ───────── */
+(function qr(){
+  const c = $("qr").getContext("2d");
+  const N = 21, cell = 90/N;
+  c.fillStyle = "#fff"; c.fillRect(0,0,90,90);
+  c.fillStyle = "#000";
+  let seed = 7;
+  const rnd = () => (seed = (seed*1103515245+12345) & 0x7fffffff) / 0x7fffffff;
+  for (let y=0;y<N;y++) for (let x=0;x<N;x++){
+    const inFinder = (x<7&&y<7)||(x>N-8&&y<7)||(x<7&&y>N-8);
+    if (inFinder) continue;
+    if (rnd() > .55) c.fillRect(x*cell,y*cell,cell,cell);
+  }
+  [[0,0],[N-7,0],[0,N-7]].forEach(([fx,fy])=>{
+    c.fillStyle="#000"; c.fillRect(fx*cell,fy*cell,7*cell,7*cell);
+    c.fillStyle="#fff"; c.fillRect((fx+1)*cell,(fy+1)*cell,5*cell,5*cell);
+    c.fillStyle="#000"; c.fillRect((fx+2)*cell,(fy+2)*cell,3*cell,3*cell);
+  });
+})();
+
+fit();
+paint();
+booted = true;
+</script>
+</body>
+</html>

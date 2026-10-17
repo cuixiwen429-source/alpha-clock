@@ -1,0 +1,14 @@
+{
+  "name": "alpha-clock-monorepo",
+  "private": true,
+  "type": "module",
+  "description": "半衰期 / Alpha Clock —— 这条消息，每 400 毫秒便宜一点。",
+  "scripts": {
+    "mock": "node shared/mock/server.mjs",
+    "mock:fast": "MOCK_HALFLIFE=8 node shared/mock/server.mjs",
+    "check": "node shared/check-contract.mjs",
+    "test": "node --test shared/*.test.mjs",
+    "ci": "node --test shared/*.test.mjs && node shared/ci-mock-check.mjs"
+  },
+  "engines": { "node": ">=20" }
+}

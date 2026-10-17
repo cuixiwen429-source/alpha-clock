@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>半衰期 · Alpha Clock</title>
+<link rel="stylesheet" href="css/base.css" />
+</head>
+<body>
+<main>
+  <h1>这条消息，每 400 毫秒便宜一点。</h1>
+  <p class="dim">后端：<code id="base"></code> <span id="mode"></span></p>
+  <ul id="list"></ul>
+  <p><a href="publish.html">发布台</a></p>
+  <p class="dim">切换后端：在任意页面地址后加 <code>?api=http://主机:4030</code>（会记住），<code>?api=reset</code> 恢复同源。</p>
+</main>
+<script type="module">
+import { api } from "./js/api.js";
+document.getElementById("base").textContent = api.base;
+try {
+  const cfg = await api.config();
+  document.getElementById("mode").textContent = cfg.mock ? "（MOCK）" : `（${cfg.network}）`;
+  document.getElementById("list").innerHTML = (await api.signals())
+    .map((s) => `<li>#${s.id} ${s.title} · $${s.price} · <a href="s.html?id=${s.id}">购买页</a> · <a href="live.html?id=${s.id}">大屏</a></li>`)
+    .join("");
+} catch (e) {
+  document.getElementById("mode").textContent = "连接失败：" + e.message;
+}
+</script>
+</body>
+</html>

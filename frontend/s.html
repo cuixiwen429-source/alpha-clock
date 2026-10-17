@@ -1,0 +1,145 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>半衰期 · 购买</title>
+<link rel="stylesheet" href="css/base.css" />
+</head>
+<body class="mobile">
+<!-- 骨架页：数据与状态机已接通，视觉按 Alpha-Clock-视觉规范.md 替换 -->
+<main id="app">
+  <h1 id="title">加载中…</h1>
+  <p id="preview" class="dim"></p>
+  <div id="price" class="price">$ —</div>
+  <p id="cadence" class="dim"></p>
+  <svg id="spark" viewBox="0 0 300 60" preserveAspectRatio="none" aria-hidden="true"></svg>
+  <p id="wait"></p>
+  <p id="countdown" class="dim"></p>
+  <button id="cta" type="button" disabled>…</button>
+  <p id="social" class="dim"></p>
+  <p id="err" class="err" role="alert"></p>
+</main>
+
+<section id="receipt" hidden aria-live="polite">
+  <h2>你是第 <b id="r-rank"></b> 个知道的</h2>
+  <dl>
+    <dt>你付了</dt><dd id="r-paid"></dd>
+    <dt>第一个人付了</dt><dd id="r-first"></dd>
+    <dt>你比 ta 少付</dt><dd id="r-mult"></dd>
+    <dt>你晚了</dt><dd id="r-late"></dd>
+  </dl>
+  <pre id="r-body"></pre>
+  <p class="dim">这句话，一个字都没变</p>
+</section>
+
+<footer class="disclaimer">本页内容为研究观点分享，不构成投资建议。内容将在 8 个半衰期后永久免费公开。</footer>
+
+<script type="module">
+import { api, syncClock, serverNow, toCurveSig } from "./js/api.js";
+import { buy, claim, identity } from "./js/wallet.js";
+import { priceAt, freeAt, sampleCurve, fmtUsdc } from "./shared/curve.mjs";
+
+const id = Number(new URLSearchParams(location.search).get("id") || 1);
+const $ = (s) => document.getElementById(s);
+const money = (m) => "$" + fmtUsdc(m);
+const mmss = (s) => `${Math.floor(s / 60)} 分 ${String(Math.floor(s % 60)).padStart(2, "0")} 秒`;
+
+// 状态机：LOADING → LIVE → QUOTING → PAYING → PURCHASED；LIVE --freeAt--> FREE --claim--> CLAIMED
+let state = "LOADING", sig, meta, quote;
+
+async function refresh() {
+  meta = await api.signal(id);
+  syncClock(meta.serverTime);
+  sig = toCurveSig(meta);
+  $("title").textContent = meta.title;
+  $("preview").textContent = meta.previewText;
+  $("social").textContent = meta.buyers ? `已有 ${meta.buyers} 人买过` : "还没有人买";
+  drawSpark();
+}
+
+function drawSpark() {
+  const { times, prices } = sampleCurve(sig, 60);
+  const max = Number(prices[0]) || 1, span = times.at(-1) || 1;
+  const pts = times.map((t, i) => `${(t / span) * 300},${60 - (Number(prices[i]) / max) * 56}`).join(" ");
+  $("spark").innerHTML = `<polyline points="${pts}" fill="none" stroke="currentColor" stroke-width="2" />`;
+}
+
+// 每 400ms 本地插值（PRD §9.2），按钮金额与主价格同源
+function render() {
+  if (!sig) return;
+  const t = serverNow();
+  const p = priceAt(sig, t);
+  if (p === 0n && state === "LIVE") state = "FREE";
+  $("price").textContent = p === 0n ? "现在免费" : money(p);
+  $("price").classList.toggle("free", p === 0n);
+  const left = Math.max(0, freeAt(sig) - t);
+  $("countdown").textContent = p === 0n ? "已永久公开" : `${mmss(left)}后免费`;
+  if (p > 0n) {
+    $("cadence").textContent = `每 ${(sig.halfLife / 32).toFixed(1)} 秒便宜一点`;
+    $("wait").textContent = `再等 30 秒省 ${money(p - priceAt(sig, t + 30))}`;
+  } else {
+    $("cadence").textContent = $("wait").textContent = "";
+  }
+
+  const cta = $("cta");
+  if (state === "LIVE") { cta.disabled = false; cta.textContent = `现在买 · $${fmtUsdc(p).slice(0, -4)}`; cta.className = ""; }
+  if (state === "FREE") { cta.disabled = false; cta.textContent = "现在免费 · 立即领取"; cta.className = "go"; }
+  if (state === "QUOTING") { cta.disabled = true; cta.textContent = "锁价中…"; }
+}
+
+$("cta").onclick = async () => {
+  $("err").textContent = "";
+  try {
+    let content;
+    if (state === "LIVE") {
+      state = "QUOTING";
+      quote = await api.quote(id);
+      state = "PAYING";
+      $("cta").disabled = true;
+      $("cta").textContent = `已锁定 $${quote.amount}（10 秒内有效）`;
+      content = await buy(id, quote, (step) => ($("cta").textContent = step));
+      state = "PURCHASED";
+    } else if (state === "FREE") {
+      $("cta").disabled = true;
+      content = await claim(id);
+      state = "CLAIMED";
+    } else return;
+    await showReceipt(content);
+  } catch (e) {
+    $("err").textContent = e.message;
+    if (e.code === "FREE_ALREADY") state = "FREE";
+    else if (e.code === "ALREADY_OWN") return showReceipt(await api.content(id, identity()));
+    else state = priceAt(sig, serverNow()) === 0n ? "FREE" : "LIVE";
+  }
+};
+
+async function showReceipt(content) {
+  const r = await api.receipt(id, identity());
+  $("r-rank").textContent = r.rank;
+  $("r-paid").textContent = "$" + r.paid;
+  $("r-first").textContent = "$" + r.firstPaid;
+  $("r-mult").textContent = r.multipleVsFirst + " 倍";
+  $("r-late").textContent = mmss(r.elapsed);
+  $("r-body").textContent = content.body;
+  $("app").hidden = true;
+  $("receipt").hidden = false;
+}
+
+async function init() {
+  await refresh();
+  // 已经拿过就直接展示收据
+  try { return void (await showReceipt(await api.content(id, identity()))); } catch {}
+  state = priceAt(sig, serverNow()) === 0n ? "FREE" : "LIVE";
+  setInterval(render, 400);
+  setInterval(() => refresh().catch(() => {}), 5000); // 每 5s 与服务端校准
+  render();
+}
+
+init().catch((e) => {
+  $("title").textContent = "加载失败";
+  $("err").textContent = e.message;
+});
+</script>
+</body>
+</html>

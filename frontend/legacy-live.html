@@ -1,0 +1,317 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>AlphaClock — 一条信息的价格，每秒都在掉</title>
+<style>
+  :root{
+    --bg:#08080c; --panel:#101018; --line:#1e1e2a;
+    --fg:#ececf2; --dim:#6b6b80; --gold:#f5b942; --red:#ff4d4d; --green:#2ee6a8;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{height:100%}
+  body{
+    background:var(--bg); color:var(--fg); overflow:hidden;
+    font-family:"SF Mono","JetBrains Mono",Menlo,Consolas,"PingFang SC","Microsoft YaHei",monospace;
+    -webkit-font-smoothing:antialiased;
+  }
+  .wrap{display:grid;grid-template-columns:1fr 420px;height:100vh}
+
+  /* ── 左：主视觉 ── */
+  .main{padding:52px 56px;display:flex;flex-direction:column;position:relative;overflow:hidden}
+  .top{display:flex;align-items:center;justify-content:space-between;margin-bottom:28px}
+  .brand{font-size:15px;letter-spacing:.34em;color:var(--dim);text-transform:uppercase}
+  .brand b{color:var(--gold);font-weight:600}
+  .live{display:flex;align-items:center;gap:9px;font-size:13px;color:var(--dim)}
+  .dot{width:8px;height:8px;border-radius:50%;background:var(--green);box-shadow:0 0 14px var(--green);animation:pulse 1.4s infinite}
+  @keyframes pulse{0%,100%{opacity:1}50%{opacity:.25}}
+
+  .title{font-size:34px;line-height:1.35;font-weight:500;letter-spacing:.01em;margin-bottom:8px;max-width:14ch}
+  .meta{font-size:13px;color:var(--dim);margin-bottom:26px}
+
+  .priceRow{display:flex;align-items:flex-end;gap:22px;margin-bottom:4px}
+  .price{
+    font-size:128px;line-height:.92;font-weight:600;color:var(--gold);
+    font-variant-numeric:tabular-nums;letter-spacing:-.03em;
+    text-shadow:0 0 60px rgba(245,185,66,.22);
+    transition:color .3s;
+  }
+  .price.free{color:var(--green);font-size:92px;text-shadow:0 0 70px rgba(46,230,168,.32)}
+  .delta{font-size:17px;color:var(--green);padding-bottom:12px;font-variant-numeric:tabular-nums}
+  .delta.zero{color:var(--dim)}
+
+  .chart{flex:1;min-height:180px;margin:18px 0 10px;position:relative}
+  svg{width:100%;height:100%;display:block;overflow:visible}
+
+  .stats{display:flex;gap:44px;padding-top:22px;border-top:1px solid var(--line)}
+  .stat .k{font-size:11px;letter-spacing:.2em;color:var(--dim);text-transform:uppercase;margin-bottom:7px}
+  .stat .v{font-size:23px;font-variant-numeric:tabular-nums}
+  .stat .v.hot{color:var(--gold)}
+
+  /* ── 右：成交流水 ── */
+  .side{background:var(--panel);border-left:1px solid var(--line);display:flex;flex-direction:column}
+  .sideHead{padding:26px 26px 16px;border-bottom:1px solid var(--line)}
+  .sideHead h2{font-size:12px;letter-spacing:.24em;color:var(--dim);text-transform:uppercase;font-weight:500}
+  .sideHead .big{font-size:44px;color:var(--gold);font-variant-numeric:tabular-nums;margin-top:10px;font-weight:600}
+  .sideHead .sub{font-size:12px;color:var(--dim);margin-top:4px}
+  .feed{flex:1;overflow-y:auto;padding:10px 0}
+  .feed::-webkit-scrollbar{width:0}
+  .row{
+    display:grid;grid-template-columns:52px 1fr 86px;gap:10px;align-items:center;
+    padding:11px 26px;font-size:14px;font-variant-numeric:tabular-nums;
+    animation:slide .45s cubic-bezier(.22,1,.36,1);
+  }
+  @keyframes slide{from{opacity:0;transform:translateX(18px)}to{opacity:1;transform:none}}
+  .row .t{color:var(--dim);font-size:12px}
+  .row .who{color:var(--fg);display:flex;align-items:center;gap:8px}
+  .row .who .b{width:6px;height:6px;border-radius:50%;background:var(--gold);flex:none}
+  .row .who .b.x{background:var(--green)}
+  .row .p{text-align:right;color:var(--gold)}
+  .empty{padding:40px 26px;color:var(--dim);font-size:13px;line-height:1.9}
+
+  .foot{padding:16px 26px;border-top:1px solid var(--line);font-size:11px;color:var(--dim);letter-spacing:.06em;line-height:1.7}
+  .foot b{color:var(--fg);font-weight:500}
+
+  .quote{
+    position:absolute;left:56px;bottom:26px;font-size:14px;color:var(--dim);
+    letter-spacing:.02em;transition:opacity .6s;
+  }
+  .quote b{color:var(--gold);font-weight:500}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="main">
+    <div class="top">
+      <div class="brand"><b>Alpha</b>Clock</div>
+      <div class="live"><span class="dot"></span><span id="net">链上实时</span></div>
+    </div>
+
+    <div class="title" id="title">加载中…</div>
+    <div class="meta" id="meta"></div>
+
+    <div class="priceRow">
+      <div class="price" id="price">—</div>
+      <div class="delta" id="delta"></div>
+    </div>
+
+    <div class="chart"><svg id="svg" preserveAspectRatio="none"></svg></div>
+
+    <div class="stats">
+      <div class="stat"><div class="k">已售</div><div class="v" id="sold">0</div></div>
+      <div class="stat"><div class="k">总收入</div><div class="v hot" id="rev">$0</div></div>
+      <div class="stat"><div class="k">永久免费倒计时</div><div class="v" id="ttf">—</div></div>
+      <div class="stat"><div class="k">半衰期</div><div class="v" id="hl">—</div></div>
+    </div>
+
+    <div class="quote" id="quote"></div>
+  </div>
+
+  <div class="side">
+    <div class="sideHead">
+      <h2>成交记录</h2>
+      <div class="big" id="feedCount">0</div>
+      <div class="sub">每一笔都是「你比别人早看到了多久」的价格</div>
+    </div>
+    <div class="feed" id="feed"></div>
+    <div class="foot">
+      价格由链上合约计算 · 任何人可复核<br />
+      <b id="contract">—</b>
+    </div>
+  </div>
+</div>
+
+<script>
+const API = location.origin;
+let S = null;          // 最新 signal 快照
+let buys = [];
+let base = 0;
+let publishedAt = 0, halfLife = 1, basePrice = 0, floorPrice = 0;
+
+const $ = id => document.getElementById(id);
+
+function money(v){
+  if (v <= 0) return "$0";
+  if (v >= 1) return "$" + v.toFixed(2);
+  if (v >= 0.01) return "$" + v.toFixed(3);
+  return "$" + v.toFixed(6).replace(/0+$/,"");
+}
+function hms(s){
+  s = Math.max(0, Math.floor(s));
+  const m = Math.floor(s/60), ss = s%60;
+  return `${String(m).padStart(2,"0")}:${String(ss).padStart(2,"0")}`;
+}
+
+// ── 本地连续衰减，让数字每帧都在掉（而不是 500ms 跳一次）──
+function priceNow(){
+  if (!publishedAt) return 0;
+  const el = Date.now()/1000 - publishedAt;
+  if (el <= 0) return basePrice;
+  const steps = Math.floor(el * 32 / halfLife);
+  if (steps >= 8*32) return 0;
+  const intp = Math.floor(steps/32), frac = steps % 32;
+  const f = Math.pow(2, -frac/32);
+  let p = (basePrice / Math.pow(2, intp)) * f;
+  return Math.max(p, floorPrice);
+}
+
+function tick(){
+  if (!publishedAt) return;
+  const p = priceNow();
+  const free = p <= 0;
+  const el = $("price");
+  el.classList.toggle("free", free);
+  el.textContent = free ? "免费" : money(p);
+
+  const d = $("delta");
+  if (base && p > 0 && p < base){
+    const pct = (1 - p/base) * 100;
+    d.textContent = `已下跌 ${pct.toFixed(1)}%`;
+    d.classList.remove("zero");
+  } else {
+    d.textContent = base ? "刚发布" : "";
+    d.classList.add("zero");
+  }
+
+  // 倒计时
+  const total = halfLife * 8;
+  const remain = publishedAt + total - Date.now()/1000;
+  $("ttf").textContent = remain > 0 ? hms(remain) : "已免费";
+
+  drawChart(p);
+  requestAnimationFrame(tick);
+}
+
+// ── 曲线：滚动窗口，让曲线填满屏幕 ──
+// 全 16 分钟铺满的话，前 1 分钟只占 6% 宽度，看起来"数字掉了 44% 图上才走一小段"。
+// 所以 x 轴只显示 [0, now + 1.5×halfLife]（至少 2 个半衰期），像心电图一样往前滚。
+function drawChart(now){
+  const svg = $("svg");
+  const w = svg.clientWidth || 800, h = svg.clientHeight || 200;
+  const pad = { t: 16, b: 26, l: 0, r: 0 };
+  const total = halfLife * 8;
+  const W = w - pad.l - pad.r, H = h - pad.t - pad.b;
+
+  const nowEl = Math.max(0, Date.now()/1000 - publishedAt);
+  const window_end = Math.min(total, Math.max(nowEl + halfLife * 1.5, halfLife * 2));
+
+  const priceOf = t => {
+    const steps = Math.floor(t * 32 / halfLife);
+    if (steps >= 8*32) return 0;
+    return Math.max(basePrice / Math.pow(2, Math.floor(steps/32)) * Math.pow(2, -(steps%32)/32), floorPrice);
+  };
+
+  const maxP = basePrice || 1;
+  const x = t => pad.l + (Math.min(t, window_end)/window_end) * W;
+  const y = p => pad.t + H - (p/maxP) * H;
+
+  // 过去：逐步采样到"现在"
+  const past = [];
+  const N = 48;
+  for (let i=0;i<=N;i++){
+    const t = nowEl * i / N;
+    past.push([t, priceOf(t)]);
+  }
+  past[past.length-1] = [nowEl, now];
+
+  // 未来：从"现在"到窗口右端
+  const fut = [];
+  const M = 40;
+  for (let i=1;i<=M;i++){
+    const t = nowEl + (window_end - nowEl) * i / M;
+    fut.push([t, priceOf(t)]);
+  }
+
+  const toPath = pts => pts.map((p,i)=>`${i?"L":"M"}${x(p[0]).toFixed(1)},${y(p[1]).toFixed(1)}`).join(" ");
+  const dPath = toPath(past);
+  const fPath = toPath([[nowEl, now], ...fut]);
+
+  // 横向参考线 + 价格标签
+  const grid = [0,.25,.5,.75,1].map(f=>{
+    const yy = pad.t + H*f;
+    const pv = maxP * (1-f);
+    return `<line x1="0" y1="${yy.toFixed(1)}" x2="${w}" y2="${yy.toFixed(1)}" stroke="#1a1a26" stroke-width="1"/>`
+      + (f<1 ? `<text x="6" y="${(yy-6).toFixed(1)}" fill="#3a3a50" font-size="10">${money(pv)}</text>` : "");
+  }).join("");
+
+  svg.innerHTML = `
+    <defs>
+      <linearGradient id="g" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0%" stop-color="#f5b942" stop-opacity=".30"/>
+        <stop offset="100%" stop-color="#f5b942" stop-opacity="0"/>
+      </linearGradient>
+      <linearGradient id="lg" x1="0" y1="0" x2="1" y2="0">
+        <stop offset="0%" stop-color="#f5b942"/>
+        <stop offset="70%" stop-color="#ff9a3d"/>
+        <stop offset="100%" stop-color="#ff6b3d"/>
+      </linearGradient>
+    </defs>
+    ${grid}
+    <path d="${dPath} L${x(nowEl).toFixed(1)},${(pad.t+H).toFixed(1)} L0,${(pad.t+H).toFixed(1)} Z" fill="url(#g)"/>
+    <path d="${fPath}" fill="none" stroke="#2c2c40" stroke-width="1.5" stroke-dasharray="4 6"/>
+    <path d="${dPath}" fill="none" stroke="url(#lg)" stroke-width="3" stroke-linejoin="round" stroke-linecap="round"/>
+    ${buys.map(b=>{
+      const t = b.elapsed;
+      if (t > window_end) return "";
+      return `<circle cx="${x(t).toFixed(1)}" cy="${y(b.price).toFixed(1)}" r="3.5" fill="#2ee6a8"/>`;
+    }).join("")}
+    <line x1="${x(nowEl).toFixed(1)}" y1="${pad.t}" x2="${x(nowEl).toFixed(1)}" y2="${(pad.t+H).toFixed(1)}"
+          stroke="#f5b942" stroke-width="1" stroke-opacity=".22" stroke-dasharray="2 5"/>
+    <circle cx="${x(nowEl).toFixed(1)}" cy="${y(now).toFixed(1)}" r="6" fill="#f5b942"/>
+    <circle cx="${x(nowEl).toFixed(1)}" cy="${y(now).toFixed(1)}" r="13" fill="#f5b942" opacity=".16"/>
+    <text x="4" y="${(pad.t+H+19).toFixed(1)}" fill="#5a5a72" font-size="11">发布</text>
+    <text x="${Math.min(x(nowEl)+8, w-60).toFixed(1)}" y="${(pad.t+H+19).toFixed(1)}" fill="#f5b942" font-size="11">现在</text>
+    <text x="${(w-4)}" y="${(pad.t+H+19).toFixed(1)}" fill="#5a5a72" font-size="11" text-anchor="end">${window_end>=total?"永久免费":"…"}</text>
+  `;
+}
+
+// ── 拉数据 ──
+async function load(){
+  try{
+    const r = await fetch(`${API}/api/signal/1`);
+    S = await r.json();
+    if (!S || S.error) return;
+
+    $("title").textContent = S.title;
+    $("meta").textContent = `发布于 ${new Date(S.publishedAt*1000).toLocaleTimeString("zh-CN")} · 起始价 ${money(S.basePrice)}`;
+    publishedAt = S.publishedAt; halfLife = S.halfLife; basePrice = S.basePrice; floorPrice = S.floorPrice;
+    base = S.basePrice;
+    $("sold").textContent = S.buyCount;
+    $("rev").textContent = "$" + S.revenue.toFixed(2);
+    $("hl").textContent = S.halfLife + "s";
+    $("feedCount").textContent = S.buyCount;
+    $("net").textContent = S.freeNow ? "已免费公开" : "链上实时";
+    $("contract").textContent = (S.publisher||"").slice(0,10) + "…";
+  }catch(e){}
+}
+
+async function loadBuys(){
+  try{
+    const r = await fetch(`${API}/api/signal/1/buys`);
+    const arr = await r.json();
+    if (!Array.isArray(arr)) return;
+    const changed = arr.length !== buys.length;
+    buys = arr;
+    if (!changed) return;
+
+    const feed = $("feed");
+    feed.innerHTML = arr.slice().reverse().map((b,i)=>`
+      <div class="row" style="animation-delay:${i*20}ms">
+        <div class="t">+${b.elapsed}s</div>
+        <div class="who"><span class="b ${b.viaX402?"x":""}"></span>${b.buyer.slice(0,6)}…${b.buyer.slice(-4)}</div>
+        <div class="p">${money(b.price)}</div>
+      </div>`).join("") || `<div class="empty">还没有人买。<br/>第一个买的人付得最多，<br/>但他最早知道。</div>`;
+  }catch(e){}
+}
+
+(async function(){
+  await load();
+  await loadBuys();
+  requestAnimationFrame(tick);
+  setInterval(load, 1000);
+  setInterval(loadBuys, 1500);
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,6 @@
+# 改动这些目录的 PR 会自动请求对应负责人 review。
+# TODO: 把 @BACKEND_OWNER 换成后端同学的 GitHub 用户名
+/frontend/   @cuixiwen429-source
+/backend/    @BACKEND_OWNER
+# 契约：前后端都要 review
+/shared/     @cuixiwen429-source @BACKEND_OWNER
