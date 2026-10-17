@@ -540,35 +540,71 @@ export function createApp(ctx: AppContext) {
 
   app.get("/api/live/:id/stream", route(async (req, res) => {
     const id = parseId(req.params.id);
-    const signal = await requireSignal(ctx, id);
+    // 注意：signal 是「连接建立那一刻」的快照，forcedOpen 之后就不会再变。
+    // 所以下面所有价格计算都必须用会刷新的 current，否则发布者点「提前公开」
+    // 之后这个连接会一直报旧价格，大屏上永远不会出现归零。
+    let current = await requireSignal(ctx, id);
+    let openedAt: number | null = null;
     res.status(200);
     res.setHeader("Content-Type", "text/event-stream; charset=utf-8");
     res.setHeader("Cache-Control", "no-cache, no-transform");
     res.setHeader("Connection", "keep-alive");
     res.flushHeaders();
-    const send = (event: string, data: unknown) => res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
+    let closed = false;
+    const send = (event: string, data: unknown) => {
+      // 客户端断开后仍可能有 tick 在 await 途中，写已 end 的响应会抛
+      // ERR_STREAM_WRITE_AFTER_END，把整个进程一起带走。
+      if (closed || res.writableEnded) return;
+      res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
+    };
     let openedSent = false;
+    let ticks = 0;
     const tick = async () => {
+      // 每 10 次（约 8s）回链上重读一次。索引器挂掉或事件还没索引到时，
+      // 这条兜底路径能保证大屏最终看到 openNow 的结果。
+      if (++ticks % 10 === 0) {
+        try {
+          const fresh = await ctx.gateway.readSignal(id);
+          if (fresh) current = fresh;
+        } catch {
+          /* 单次失败沿用旧值，下个周期再试 */
+        }
+      }
       const now = await chainTime(ctx);
-      const price = priceAt(signal, now);
+      const price = priceAt(current, now);
       send("tick", {
         price: fmtUsdc(price),
         priceMicro: price.toString(),
-        timeToFree: price === 0n ? 0 : Math.max(0, freeAt(signal) - now),
+        timeToFree: price === 0n ? 0 : Math.max(0, freeAt(current) - now),
         serverTime: now,
       });
       if (price === 0n && !openedSent) {
         openedSent = true;
-        send("opened", { at: signal.forcedOpen ? now : freeAt(signal) });
+        send("opened", { at: openedAt ?? (current.forcedOpen ? now : freeAt(current)) });
       }
     };
     await tick();
     const timer = setInterval(() => void tick().catch(() => undefined), 800);
     const unsubscribe = ctx.indexer.subscribe((event) => {
       if (event.signalId !== id) return;
+      if (event.event === "opened") {
+        openedAt = event.data.at;
+        void ctx.gateway
+          .readSignal(id)
+          .then((fresh) => {
+            if (fresh) current = fresh;
+            return tick();
+          })
+          .catch(() => undefined);
+        // tick 可能已经先看到价格归零并推过一次 opened，这里不能重复推，
+        // 否则大屏会把"开放"动画播两遍。
+        if (openedSent) return;
+        openedSent = true;
+      }
       send(event.event, event.event === "trade" ? tradeView(event.data) : event.data);
     });
     req.on("close", () => {
+      closed = true;
       clearInterval(timer);
       unsubscribe();
       res.end();

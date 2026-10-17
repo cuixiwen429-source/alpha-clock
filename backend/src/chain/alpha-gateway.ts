@@ -12,6 +12,16 @@ import { privateKeyToAccount } from "viem/accounts";
 import { ALPHA_ABI, ALPHA_LEGACY_ABI, getDeployments, getNetwork, type Deployments, type NetConfig } from "../config.js";
 import type { AccessRecord, ChainSignal } from "../domain/types.js";
 
+/**
+ * 等回执的上限。前端把 txHash 传上来时，如果那笔交易一直不被打包
+ * （gas 太低、nonce 卡住、RPC 掉线），没有超时的 waitForTransactionReceipt
+ * 会让这个 HTTP 请求永久挂着 —— 客户端只能等到自己超时，后端连接也一起占着。
+ */
+const RECEIPT_TIMEOUT_MS = (() => {
+  const raw = Number(process.env.TX_TIMEOUT_MS ?? 90_000);
+  return Number.isFinite(raw) && raw > 0 ? raw : 90_000;
+})();
+
 export class AlphaGateway {
   readonly net: NetConfig;
   readonly deployments: Deployments;
@@ -193,7 +203,7 @@ export class AlphaGateway {
   }
 
   async publishedId(txHash: Hex, expectedContentHash: Hex): Promise<number> {
-    const receipt = await this.publicClient.waitForTransactionReceipt({ hash: txHash });
+    const receipt = await this.waitReceipt(txHash);
     if (receipt.status !== "success") throw new Error("publish 交易执行失败");
     const logs = parseEventLogs({ abi: ALPHA_ABI, eventName: "Published", logs: receipt.logs, strict: true });
     const event = logs.find((log) => log.address.toLowerCase() === this.alpha.toLowerCase());
@@ -225,8 +235,20 @@ export class AlphaGateway {
       gas: estimate + estimate / 10n,
       chain: null,
     });
-    const receipt = await this.publicClient.waitForTransactionReceipt({ hash });
+    const receipt = await this.waitReceipt(hash);
     if (receipt.status !== "success") throw new Error("recordX402 交易执行失败");
     return hash;
+  }
+
+  /** 带超时的 waitForTransactionReceipt，超时给一句人话而不是把请求挂死 */
+  private async waitReceipt(hash: Hex) {
+    try {
+      return await this.publicClient.waitForTransactionReceipt({ hash, timeout: RECEIPT_TIMEOUT_MS });
+    } catch (error) {
+      if (String((error as Error)?.name ?? "").includes("Timeout")) {
+        throw new Error(`交易 ${hash.slice(0, 10)}… 在 ${RECEIPT_TIMEOUT_MS / 1000}s 内没有确认（可用 TX_TIMEOUT_MS 调整）`);
+      }
+      throw error;
+    }
   }
 }

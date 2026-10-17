@@ -100,3 +100,19 @@ await wallet.writeContract({ address: cfg.contract, abi: [{ type: "function", na
 - `shared/` 我一个字没改（契约照旧 v1.0.0），只补了后端和合约。
 - 前端代码我一行没动。上面所有验证都是 curl / 脚本层，**UI 长什么样我没看过**，视觉效果仍然由你负责。
 - `frontend/shared` 是指向 `../shared` 的软链接，价格曲线和字段校验都是同一份文件，不存在两边算法不一致的问题。
+
+## 7. 第二轮 review 的结论（后端侧）
+
+**修掉的：**
+
+1. `GET /api/live/:id/stream` 连上之后再点「提前公开」，这个连接会一直报旧价格 —— 它在建立时拍了一张 `signal` 快照，`forcedOpen` 永远是 false。现在每 8 秒回链上重读一次，并且收到索引器的 `opened` 事件时立刻重算。实测：8.59 → 0.000000，`opened` 只发一次。
+2. 前端把 `txHash` 传上来时，如果那笔交易一直不打包，后端会**永久挂住那个请求**（`waitForTransactionReceipt` 没有超时）。现在 90 秒超时，可用 `TX_TIMEOUT_MS` 调。
+3. 索引器启动只试一次：RPC 抖一下，索引器就永远不跑了，而 `/health` 照样 ok。现在指数退避重试。
+4. `deploy:local` / `deploy:testnet` 现在先 `reset-state`：重新部署后 id 从 1 开始，旧的 `content.json`、免费领取记录、报价全是上一条链的。旧报价里的 `payTo` 还是旧发布者 —— 拿它走 x402，钱会打给一个跟新信号无关的地址。
+5. SSE 客户端断开后仍在 await 途中的 tick 会往已结束的响应写入，可能带崩进程。加了 closed 守卫。
+
+**发现但没改的（给你参考）：**
+
+- `frontend/js/api.js` 的 `api.stream()`：`es.onerror` 里直接 `es.close()` 并**永久降级为轮询**。EventSource 在弱网下每次重连都会触发 `onerror`，所以大屏只要有一下抖动，整场都变成 1s 轮询（没有 `trade`/`stampede` 实时事件，只有 tick）。建议改成「先让 EventSource 自己重连，连续失败 3 次再降级」。
+- `/content?buyer=` 只凭地址放行，`shared/API.md` 第 60 行已经把它写成明示取舍（「防君子」）。要真防，得加钱包签名挑战，那要改契约，得双方一起动手。
+- `/api/signals` 每次请求对每条信号各读一次合约（N+1）。现在 3–5 条无所谓，真到几十条要加按区块号的缓存。

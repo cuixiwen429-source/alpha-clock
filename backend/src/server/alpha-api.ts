@@ -32,11 +32,25 @@ server.on("error", (error: NodeJS.ErrnoException) => {
   process.exit(1);
 });
 
-void gateway
-  .assertNetwork()
-  .then(() => indexer.start())
-  .then(() => console.log("event indexer started"))
-  .catch((error) => console.error("event indexer unavailable", error));
+// 索引器启动要连 RPC，测试网抖动时不能只试一次就放弃：
+// 之前这里 catch 里只打一行日志，之后整个进程都不会再试，
+// 现场大屏会一直空着，而 /health 照样是 ok，看不出来哪里坏了。
+let indexerAttempt = 0;
+async function bootIndexer() {
+  indexerAttempt += 1;
+  try {
+    await gateway.assertNetwork();
+    await indexer.start();
+    console.log("event indexer started");
+  } catch (error) {
+    const waitMs = Math.min(30_000, 2_000 * indexerAttempt);
+    console.error(
+      `event indexer 启动失败（第 ${indexerAttempt} 次，${Math.round(waitMs / 1000)}s 后重试）：${(error as Error)?.message ?? error}`,
+    );
+    setTimeout(() => void bootIndexer(), waitMs).unref();
+  }
+}
+void bootIndexer();
 
 const shutdown = () => {
   indexer.stop();

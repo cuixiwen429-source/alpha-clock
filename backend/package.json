@@ -6,8 +6,9 @@
   "description": "AlphaClock — 一条信息的价格，每秒都在掉。",
   "scripts": {
     "anvil": "anvil --block-time 1 --host 127.0.0.1 --port 8545",
-    "deploy:local": "node scripts/foundry.mjs script script/Deploy.s.sol:Deploy --rpc-url http://127.0.0.1:8545 --broadcast",
-    "deploy:testnet": "node scripts/foundry.mjs script script/Deploy.s.sol:Deploy --rpc-url https://testnet-rpc.monad.xyz --broadcast",
+    "deploy:local": "node scripts/reset-state.mjs && node scripts/foundry.mjs script script/Deploy.s.sol:Deploy --rpc-url http://127.0.0.1:8545 --broadcast",
+    "deploy:testnet": "node scripts/reset-state.mjs && node scripts/foundry.mjs script script/Deploy.s.sol:Deploy --rpc-url https://testnet-rpc.monad.xyz --broadcast",
+    "reset:state": "node scripts/reset-state.mjs",
     "forge:build": "node scripts/foundry.mjs build",
     "forge:test": "node scripts/foundry.mjs test -vv",
     "seed": "tsx src/scripts/seed.ts",

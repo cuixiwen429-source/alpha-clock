@@ -34,6 +34,8 @@ npm run buy 1 1          # 用 anvil 第 1 个账户买 #1（余额不足会自�
 
 `npm run deploy:local` 会通过 `scripts/foundry.mjs` 读 `.env` 并补 `~/.foundry/bin` 到 PATH，所以 Foundry 装在默认位置时不必手动改 PATH；`deployments.json` 里会写入 `deploymentBlock`，索引器重启后能补全历史。
 
+部署脚本会先跑 `scripts/reset-state.mjs` 清掉 `content.json` / `.runtime/`：重新部署后信号 id 从 1 重新开始，本地这几份状态全部对不上新链 —— `content.json` 是 id→正文，`.runtime/free-claims.ndjson` 记着谁领过免费，`.runtime/quotes.json` 里的 `payTo` 是旧发布者。带着它们跑，轻则把上一条链的领取算到新信号头上，重则拿旧报价把 x402 的钱打给旧地址。所以部署后必须重新 `npm run seed`。只想单独清一次可以用 `npm run reset:state`。
+
 `contracts/deployments.json` 和 `content.json` 都是运行产物，**不进 git**：它们分别随部署和发布被重写，提交上去只会把某人本机的 anvil 地址带给别人。新克隆的仓库里它们不存在是正常的，按上面的顺序跑一遍就有。前端不要在本地读 `deployments.json`，合约地址一律走 `/api/config` 下发。
 
 ## 分层

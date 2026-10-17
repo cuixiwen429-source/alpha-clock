@@ -45,6 +45,7 @@ export class AlphaIndexer {
   }
 
   async start() {
+    if (this.timer) return; // 已经起来了；重试路径不能叠出第二个轮询定时器
     const latest = await this.gateway.publicClient.getBlockNumber();
     const configured = process.env.DEPLOYMENT_BLOCK?.trim();
     const start = configured
