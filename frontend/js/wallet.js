@@ -3,7 +3,7 @@
 // 真后端：浏览器钱包 → approve USDC → AlphaClock.buy(id) → 凭链上访问权取正文
 // mock：  调 /__mock/buy 模拟"链上 buy 成功"，其余流程一模一样
 
-import { api } from "./api.js";
+import { api } from "./api.js?v=20261017b";
 
 const VIEM = "https://esm.sh/viem@2.57.7"; // 仅真链模式才加载，断网演示不受影响
 const BURNER_KEY = "alpha.burner";
@@ -82,6 +82,12 @@ export async function buy(signalId, quote, onStep = () => {}) {
     return api.content(signalId, address);
   }
 
+  // 没装钱包插件时 window.ethereum 是 undefined，直接调用会抛
+  // "Cannot read properties of undefined (reading 'request')"，
+  // 现场演示时这句话没人看得懂，必须先拦一道给出人话。
+  if (!hasWallet()) {
+    throw new Error("这个浏览器没装钱包插件（MetaMask）。想体验完整购买请换装了钱包的浏览器；只想看内容可以等它免费后点「立即领取」。");
+  }
   if (!connected) await connectWallet();
   const { createWalletClient, createPublicClient, custom, http } = await import(VIEM);
   const chain = { id: cfg.chainId, name: "Monad", nativeCurrency: { name: "MON", symbol: "MON", decimals: 18 }, rpcUrls: { default: { http: [cfg.rpcUrl] } } };

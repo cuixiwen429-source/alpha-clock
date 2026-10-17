@@ -1,0 +1,10 @@
+import { createPublicClient, createWalletClient, defineChain, http, formatUnits } from "viem";
+import { privateKeyToAccount } from "viem/accounts";
+import { config as dotenv } from "dotenv";
+dotenv();
+const chain = defineChain({ id: 10143, name: "monad", nativeCurrency: { name: "MON", symbol: "MON", decimals: 18 }, rpcUrls: { default: { http: ["https://testnet-rpc.monad.xyz"] } } });
+const pub = createPublicClient({ chain, transport: http("https://testnet-rpc.monad.xyz") });
+const acct = privateKeyToAccount(process.env.PRIVATE_KEY as `0x${string}`);
+const mon = await pub.getBalance({ address: acct.address });
+const usdc = await pub.readContract({ address: "0xc64b5C61B5c11859b72c7fc69D69b0bc15155e48", abi: [{ type: "function", name: "balanceOf", stateMutability: "view", inputs: [{ name: "a", type: "address" }], outputs: [{ type: "uint256" }] }], functionName: "balanceOf", args: [acct.address] });
+console.log(acct.address, "MON", formatUnits(mon, 18), "USDC", formatUnits(usdc as bigint, 6));

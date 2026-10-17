@@ -45,13 +45,13 @@
 <footer class="disclaimer">本页内容为研究观点分享，不构成投资建议。内容将在 8 个半衰期后永久免费公开。</footer>
 
 <script type="module">
-import { api, syncClock, serverNow, toCurveSig } from "./js/api.js";
-import { buy, claim, identity, restoreIdentity } from "./js/wallet.js";
-import { priceAt, freeAt, sampleCurve } from "./shared/curve.mjs";
-import { fmtPrice, paintDigits } from "./js/price.js";
-import { mountHalfie, stepsRemainingFor } from "./js/halfie.js";
-import { loadSprite } from "./js/sprites.js";
-import { factionOf } from "./js/factions.js";
+import { api, syncClock, serverNow, toCurveSig } from "./js/api.js?v=20261017b";
+import { buy, claim, identity, restoreIdentity } from "./js/wallet.js?v=20261017b";
+import { priceAt, freeAt, sampleCurve } from "./shared/curve.mjs?v=20261017b";
+import { fmtPrice, paintDigits } from "./js/price.js?v=20261017b";
+import { mountHalfie, stepsRemainingFor } from "./js/halfie.js?v=20261017b";
+import { loadSprite } from "./js/sprites.js?v=20261017b";
+import { factionOf } from "./js/factions.js?v=20261017b";
 
 const halfie = mountHalfie(document.getElementById("halfie"), { size: 120 });
 let halfieWasFree = false;

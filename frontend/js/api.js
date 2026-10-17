@@ -5,11 +5,17 @@
 
 const LS_KEY = "alpha.api";
 
+// 挂在子路径下（nginx 路径反代，如 https://yaoguyunge.ailat.cc/alpha/）时，
+// API 也在同一个前缀下：页面 /alpha/s.html → 接口 /alpha/api/config。
+// 页面资源是相对路径，会自动带上前缀，只有这里用 location.origin 绝对地址，
+// 所以前缀必须单独推导，否则请求会打到主域根的 /api 上。
+const MOUNT_PREFIX = /^\/alpha(\/|$)/.test(location.pathname) ? "/alpha" : "";
+
 function resolveBase() {
   const q = new URLSearchParams(location.search).get("api");
   if (q === "reset") localStorage.removeItem(LS_KEY);
   else if (q) localStorage.setItem(LS_KEY, q.replace(/\/$/, ""));
-  return localStorage.getItem(LS_KEY) || location.origin;
+  return localStorage.getItem(LS_KEY) || location.origin + MOUNT_PREFIX;
 }
 
 export const API_BASE = resolveBase();

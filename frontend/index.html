@@ -21,10 +21,10 @@
   <p class="dim dev-only">切换后端：在任意页面地址后加 <code>?api=http://主机:4030</code>（会记住），<code>?api=reset</code> 恢复同源。</p>
 </main>
 <script type="module">
-import { api } from "./js/api.js";
-import { parseUsdc } from "./shared/curve.mjs";
-import { fmtPrice } from "./js/price.js";
-import { loadSprite } from "./js/sprites.js";
+import { api } from "./js/api.js?v=20261017b";
+import { parseUsdc } from "./shared/curve.mjs?v=20261017b";
+import { fmtPrice } from "./js/price.js?v=20261017b";
+import { loadSprite } from "./js/sprites.js?v=20261017b";
 
 const priceLabel = (raw) => (Number(raw) === 0 ? "免费" : "$" + fmtPrice(parseUsdc(raw)));
 const esc = (s) => String(s).replace(/[&<>"']/g, (ch) => ({
@@ -55,7 +55,11 @@ try {
     : `<li><span class="sig dim">还没有火种。去发布台带下一团下山。</span></li>`;
   for (const c of list.querySelectorAll("canvas")) paint(c, img);
 } catch (e) {
+  // 上线后 #mode 是 dev-only（隐藏），只写那儿等于什么都不显示，
+  // 首页会变成一片空白，看起来像坏了。错误必须落在榜单位置上。
   document.getElementById("mode").textContent = "连接失败：" + e.message;
+  document.getElementById("list").innerHTML =
+    `<li><span class="sig">榜单加载失败：${esc(e.message)}</span></li>`;
 }
 </script>
 </body>

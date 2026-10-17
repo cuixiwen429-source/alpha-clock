@@ -681,13 +681,29 @@ export function createApp(ctx: AppContext) {
   // 评委点一个链接就能玩；本地开发仍然走 mock / 独立静态服务，行为不变。
   if (process.env.SERVE_FRONTEND === "1") {
     const webDir = resolve(ROOT, "../frontend");
-    app.use(express.static(webDir, { extensions: ["html"], maxAge: "1h" }));
-    // mock 的链接是 /s/1、/live/1 这种形态，这里对齐，避免上线后链接风格两套
+    // maxAge 1h 会让 Cloudflare 在边缘缓存 HTML/JS 4 小时，改了代码也发不出去
+    // （线上就踩过：api.js 被缓存成没有 /alpha 前缀的旧版，接口全打到主域根上 401）。
+    // 页面和脚本一律 no-cache，让 CDN 每次回源校验；静态图片/字体仍走 1h。
+    app.use(
+      express.static(webDir, {
+        extensions: ["html"],
+        maxAge: "1h",
+        setHeaders: (res, filePath) => {
+          if (/\.(html|js|mjs)$/.test(filePath)) {
+            res.setHeader("Cache-Control", "no-cache, must-revalidate");
+          }
+        },
+      }),
+    );
+    // mock 的链接是 /s/1、/live/1 这种形态，这里对齐，避免上线后链接风格两套。
+    // 重定向必须是「上一级 + 文件名」：浏览器对 /alpha/s/1 解析 "s.html" 会得到
+    // /alpha/s/s.html（把 /s/ 当目录），解析 "../s.html" 才回到 /alpha/s.html。
+    // 同理根路径挂载时 /s/1 解析 "../s.html" 得到 /s.html，两种挂载都对。
     app.get("/s/:id", (req, res) => {
-      res.redirect(302, `/s.html?id=${encodeURIComponent(req.params.id)}`);
+      res.redirect(302, `../s.html?id=${encodeURIComponent(req.params.id)}`);
     });
     app.get("/live/:id", (req, res) => {
-      res.redirect(302, `/live.html?id=${encodeURIComponent(req.params.id)}`);
+      res.redirect(302, `../live.html?id=${encodeURIComponent(req.params.id)}`);
     });
   }
 
