@@ -61,27 +61,36 @@ async function main() {
     return;
   }
 
-  const bal = await pub.readContract({
+  let bal = await pub.readContract({
     address: dep.usdc,
     abi: ERC20_ABI,
     functionName: "balanceOf",
     args: [who],
   });
+  // 本地 MockUSDC 只给部署者初始余额，买家账户默认是 0 —— 现场演示
+  // 「开 5 个终端各买一次」时不能让人先去手动 faucet
+  if (bal < price && dep.isMockUSDC) {
+    const faucetHash = await wallet.writeContract({
+      address: dep.usdc,
+      abi: ERC20_ABI,
+      functionName: "faucet",
+      args: [who, usdc(10_000)],
+    });
+    await pub.waitForTransactionReceipt({ hash: faucetHash });
+    bal = await pub.readContract({
+      address: dep.usdc,
+      abi: ERC20_ABI,
+      functionName: "balanceOf",
+      args: [who],
+    });
+    console.log(`  已从 MockUSDC 水龙头领 ${money(bal)}`);
+  }
   if (bal < price) {
     console.error(`  USDC 不够：有 ${money(bal)}，要 ${money(price)}`);
     process.exit(1);
   }
 
   console.log(`  ${who.slice(0, 10)}… 要买 #${signalId}，此刻价格 ${money(price)}`);
-
-  // approve（只做一次，够用就行）
-  const allowance = await pub.readContract({
-    address: dep.usdc,
-    abi: ERC20_ABI,
-    functionName: "balanceOf",
-    args: [who],
-  });
-  void allowance;
 
   const approveHash = await wallet.writeContract({
     address: dep.usdc,

@@ -1,3 +1,4 @@
+import "../env.js"; // 必须是第一个 import：在 config.ts 读 process.env 之前载入 .env
 import { resolve } from "node:path";
 import { AlphaGateway } from "../chain/alpha-gateway.js";
 import { ROOT } from "../config.js";

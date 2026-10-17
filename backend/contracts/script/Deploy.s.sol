@@ -63,6 +63,8 @@ contract Deploy is Script {
         string memory json = string.concat(
             '{\n  "chainId": ',
             vm.toString(block.chainid),
+            ',\n  "deploymentBlock": ',
+            vm.toString(block.number),
             ',\n  "usdc": "',
             vm.toString(usdcAddr),
             '",\n  "isMockUSDC": ',
