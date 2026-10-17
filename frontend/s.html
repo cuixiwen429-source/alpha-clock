@@ -11,17 +11,26 @@
 <main id="app">
   <h1 id="title">加载中…</h1>
   <p id="preview" class="dim"></p>
-  <div id="price" class="price">$ —</div>
+  <canvas id="halfie" width="120" height="120" aria-hidden="true"></canvas>
+  <div id="price" class="price"><span class="unit">$</span><span id="pnum">—</span></div>
   <p id="cadence" class="dim"></p>
   <svg id="spark" viewBox="0 0 300 60" preserveAspectRatio="none" aria-hidden="true"></svg>
   <p id="wait"></p>
   <p id="countdown" class="dim"></p>
+  <p id="faction-hint" class="faction-hint" hidden>
+    <canvas id="faction-icon" width="20" height="20" aria-hidden="true"></canvas>
+    <span id="faction-text"></span>
+  </p>
   <button id="cta" type="button" disabled>…</button>
   <p id="social" class="dim"></p>
   <p id="err" class="err" role="alert"></p>
 </main>
 
 <section id="receipt" hidden aria-live="polite">
+  <p class="rank-badge">
+    <canvas id="r-faction-icon" width="24" height="24" aria-hidden="true"></canvas>
+    <span id="r-faction-name" class="dim"></span>
+  </p>
   <h2>你是第 <b id="r-rank"></b> 个知道的</h2>
   <dl>
     <dt>你付了</dt><dd id="r-paid"></dd>
@@ -30,19 +39,29 @@
     <dt>你晚了</dt><dd id="r-late"></dd>
   </dl>
   <pre id="r-body"></pre>
-  <p class="dim">这句话，一个字都没变</p>
+  <p class="dim" id="r-faction-line"></p>
 </section>
 
 <footer class="disclaimer">本页内容为研究观点分享，不构成投资建议。内容将在 8 个半衰期后永久免费公开。</footer>
 
 <script type="module">
 import { api, syncClock, serverNow, toCurveSig } from "./js/api.js";
-import { buy, claim, identity } from "./js/wallet.js";
-import { priceAt, freeAt, sampleCurve, fmtUsdc } from "./shared/curve.mjs";
+import { buy, claim, identity, restoreIdentity } from "./js/wallet.js";
+import { priceAt, freeAt, sampleCurve } from "./shared/curve.mjs";
+import { fmtPrice, paintDigits } from "./js/price.js";
+import { mountHalfie, stepsRemainingFor } from "./js/halfie.js";
+import { loadSprite } from "./js/sprites.js";
+import { factionOf } from "./js/factions.js";
+
+const halfie = mountHalfie(document.getElementById("halfie"), { size: 120 });
+let halfieWasFree = false;
+const factionIconCtx = document.getElementById("faction-icon").getContext("2d");
+factionIconCtx.imageSmoothingEnabled = false; // CSS 的 image-rendering:pixelated 只管缩放显示，canvas 内部 drawImage 插值要单独关掉
+let lastHintFaction = null;
 
 const id = Number(new URLSearchParams(location.search).get("id") || 1);
 const $ = (s) => document.getElementById(s);
-const money = (m) => "$" + fmtUsdc(m);
+const money = (m) => "$" + fmtPrice(m);
 const mmss = (s) => `${Math.floor(s / 60)} 分 ${String(Math.floor(s % 60)).padStart(2, "0")} 秒`;
 
 // 状态机：LOADING → LIVE → QUOTING → PAYING → PURCHASED；LIVE --freeAt--> FREE --claim--> CLAIMED
@@ -71,8 +90,14 @@ function render() {
   const t = serverNow();
   const p = priceAt(sig, t);
   if (p === 0n && state === "LIVE") state = "FREE";
-  $("price").textContent = p === 0n ? "现在免费" : money(p);
-  $("price").classList.toggle("free", p === 0n);
+  const isFree = p === 0n;
+
+  if (isFree && !halfieWasFree) { halfie.burstTo(0); halfieWasFree = true; }
+  else if (!isFree) { halfieWasFree = false; halfie.render(stepsRemainingFor(sig, t)); }
+  $("price").classList.toggle("free", isFree);
+  $("price").querySelector(".unit").style.display = isFree ? "none" : "";
+  if (isFree) { $("pnum").dataset.prev = ""; $("pnum").textContent = "免费"; }
+  else paintDigits($("pnum"), fmtPrice(p));
   const left = Math.max(0, freeAt(sig) - t);
   $("countdown").textContent = p === 0n ? "已永久公开" : `${mmss(left)}后免费`;
   if (p > 0n) {
@@ -83,9 +108,24 @@ function render() {
   }
 
   const cta = $("cta");
-  if (state === "LIVE") { cta.disabled = false; cta.textContent = `现在买 · $${fmtUsdc(p).slice(0, -4)}`; cta.className = ""; }
+  if (state === "LIVE") { cta.disabled = false; cta.textContent = `现在买 · ${money(p)}`; cta.className = ""; }
   if (state === "FREE") { cta.disabled = false; cta.textContent = "现在免费 · 立即领取"; cta.className = "go"; }
   if (state === "QUOTING") { cta.disabled = true; cta.textContent = "锁价中…"; }
+
+  renderFactionHint(isFree, t);
+}
+
+/** CTA 上方一行提示："现在买属于哪个阵营"，不新增操作步骤 */
+async function renderFactionHint(isFree, t) {
+  if (state !== "LIVE" && state !== "FREE") return;
+  const f = factionOf({ elapsed: t - sig.publishedAt, halfLife: sig.halfLife, channel: isFree ? "free" : undefined });
+  $("faction-hint").hidden = false;
+  $("faction-text").textContent = isFree ? `免费领取 = 加入 ${f.name} 阵营` : `现在买 = 加入 ${f.name} 阵营`;
+  if (lastHintFaction === f.key) return;
+  lastHintFaction = f.key;
+  const img = await loadSprite(f.sprite);
+  factionIconCtx.clearRect(0, 0, 20, 20);
+  factionIconCtx.drawImage(img, 0, 0, 20, 20);
 }
 
 $("cta").onclick = async () => {
@@ -97,7 +137,7 @@ $("cta").onclick = async () => {
       quote = await api.quote(id);
       state = "PAYING";
       $("cta").disabled = true;
-      $("cta").textContent = `已锁定 $${quote.amount}（10 秒内有效）`;
+      $("cta").textContent = `已锁定 ${money(quote.amountMicro)}`;
       content = await buy(id, quote, (step) => ($("cta").textContent = step));
       state = "PURCHASED";
     } else if (state === "FREE") {
@@ -122,11 +162,21 @@ async function showReceipt(content) {
   $("r-mult").textContent = r.multipleVsFirst + " 倍";
   $("r-late").textContent = mmss(r.elapsed);
   $("r-body").textContent = content.body;
+
+  const f = factionOf({ elapsed: r.elapsed, halfLife: sig.halfLife, channel: content.channel });
+  $("r-faction-name").textContent = f.name;
+  $("r-faction-line").textContent = f.line;
+  const icon = document.getElementById("r-faction-icon").getContext("2d");
+  icon.imageSmoothingEnabled = false;
+  icon.clearRect(0, 0, 24, 24);
+  icon.drawImage(await loadSprite(f.sprite), 0, 0, 24, 24);
+
   $("app").hidden = true;
   $("receipt").hidden = false;
 }
 
 async function init() {
+  await restoreIdentity();
   await refresh();
   // 已经拿过就直接展示收据
   try { return void (await showReceipt(await api.content(id, identity()))); } catch {}

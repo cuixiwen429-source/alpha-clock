@@ -2,3 +2,6 @@
    真正的样式在 tokens.css（只改这里）+ theme.css（组件）。
    —— 保留这个文件，是为了让页面 HTML 一行都不用改。 */
 @import url("theme.css");
+
+/* Halfie 掉像素组件（IP Lab / 购买页共用），不影响既有 theme.css */
+#halfie { image-rendering: pixelated; display: block; margin: 0 auto 8px; }

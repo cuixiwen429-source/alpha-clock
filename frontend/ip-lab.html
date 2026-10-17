@@ -1,0 +1,115 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>IP Lab · Halfie & Friends</title>
+<link rel="stylesheet" href="css/tokens.css" />
+<style>
+  body { background: var(--bg); color: var(--fg); font-family: var(--ui); padding: var(--s4); }
+  h1 { font-size: var(--t-title); font-weight: 500; margin-bottom: var(--s2); }
+  .dim { color: var(--fg-2); font-size: var(--t-body); margin-bottom: var(--s4); }
+  .row { display: flex; gap: var(--s4); flex-wrap: wrap; align-items: flex-start; }
+  .card { background: var(--surface); border: 1px solid var(--hair); padding: var(--s3); text-align: center; }
+  .card canvas, .card img { image-rendering: pixelated; width: 160px; height: 160px; display: block; margin: 0 auto var(--s2); }
+  .card h2 { font-size: var(--t-lead); font-weight: 500; }
+  .card p { font-size: var(--t-cap); color: var(--fg-2); margin-top: var(--s1); }
+  .status { font-size: var(--t-micro); color: var(--fg-3); margin-top: var(--s1); }
+  .status.real { color: var(--free); }
+  .halfie-box { width: 320px; }
+  .halfie-box canvas { width: 320px; height: 320px; }
+  button { font: inherit; padding: 10px 16px; background: var(--surface-2); color: var(--fg); border: 1px solid var(--hair-strong); cursor: pointer; margin-right: var(--s1); }
+  button:hover { border-color: var(--accent); }
+  #price { font-family: var(--num); font-size: 32px; color: var(--price-hot); margin-top: var(--s2); }
+  #price.free { color: var(--free); }
+</style>
+</head>
+<body>
+<h1>IP Lab</h1>
+<p class="dim">
+  没找到 <code>frontend/assets/sprites/*.png</code> 时自动用占位图（配色已对齐 tokens.css）。
+  Grok 出图后把文件丢进那个目录，文件名对上刷新页面即可，不用改代码。见 <code>docs/IP-ART-BRIEF.md</code>。
+</p>
+
+<section class="row" id="gallery"></section>
+
+<h1 style="margin-top:48px">Halfie 掉像素演示</h1>
+<p class="dim">价格每降一档，Halfie 掉一颗像素；256 格对应 8 个半衰期 × 32 档。</p>
+<div class="card halfie-box">
+  <canvas id="halfie-canvas"></canvas>
+  <div id="price">$ —</div>
+  <div style="margin-top:16px">
+    <button id="tick">模拟一跳（掉几颗）</button>
+    <button id="burst">模拟归零（全炸）</button>
+    <button id="reset">重置</button>
+  </div>
+</div>
+
+<script type="module">
+import { SPRITES, loadSprite } from "./js/sprites.js";
+import { mountHalfie } from "./js/halfie.js";
+
+// CAPTIONS 必须先声明再用——之前这段在循环后面，const 的暂时性死区导致循环里
+// 引用 CAPTIONS[name] 直接抛 ReferenceError，整个模块脚本中断执行，图库和下面的
+// Halfie 演示区全部渲染不出来。
+const CAPTIONS = {
+  halfie: "主角 · 256 颗火星",
+  "halfie-free": "Halfie · 免费态",
+  bolt: "Bolt · 第一个知道",
+  rush: "Rush · 嗅到风声就出手",
+  hoot: "Hoot · 算好了才买",
+  lazlo: "Lazlo · 反正最后都免费",
+};
+
+const gallery = document.getElementById("gallery");
+for (const name of Object.keys(SPRITES)) {
+  const card = document.createElement("div");
+  card.className = "card";
+  card.innerHTML = `<canvas width="160" height="160"></canvas><h2>${name}</h2><p>${CAPTIONS[name] || ""}</p><div class="status">检查中…</div>`;
+  gallery.appendChild(card);
+  const canvas = card.querySelector("canvas");
+  const statusEl = card.querySelector(".status");
+  loadSprite(name).then((img) => {
+    const ctx = canvas.getContext("2d");
+    ctx.imageSmoothingEnabled = false;
+    ctx.clearRect(0, 0, 160, 160);
+    ctx.drawImage(img, 0, 0, 160, 160);
+    const isReal = !img.dataset?.placeholder;
+    statusEl.textContent = isReal ? "真图已接入" : "占位图（等 AI 出图）";
+    statusEl.classList.toggle("real", isReal);
+  });
+}
+
+// ── Halfie 掉像素演示（脱离真实后端，纯手动触发，方便单独调效果） ──
+const halfie = mountHalfie(document.getElementById("halfie-canvas"), { size: 320 });
+let steps = 256;
+const priceEl = document.getElementById("price");
+
+function renderPrice() {
+  const dollars = (10 * (steps / 256)).toFixed(2);
+  priceEl.textContent = steps === 0 ? "现在免费" : `$ ${dollars}`;
+  priceEl.classList.toggle("free", steps === 0);
+}
+
+halfie.render(steps);
+renderPrice();
+
+document.getElementById("tick").onclick = () => {
+  steps = Math.max(0, steps - (3 + Math.floor(Math.random() * 10)));
+  halfie.render(steps);
+  renderPrice();
+};
+document.getElementById("burst").onclick = () => {
+  halfie.burstTo(0);
+  steps = 0;
+  renderPrice();
+};
+document.getElementById("reset").onclick = () => {
+  steps = 256;
+  halfie.render(steps);
+  // burstTo 会把 isFree 锁住，这里直接重新 mount 简化演示
+  location.reload();
+};
+</script>
+</body>
+</html>

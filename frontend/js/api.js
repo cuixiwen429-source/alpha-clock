@@ -62,7 +62,7 @@ export const api = {
    * 返回取消函数。
    */
   stream(id, handlers) {
-    let es, timer, closed = false;
+    let es, timer, closed = false, errs = 0;
     const poll = () => {
       if (closed || timer) return;
       timer = setInterval(() => api.live(id).then((d) => handlers.snapshot?.(d)).catch(() => {}), 1000);
@@ -72,7 +72,16 @@ export const api = {
       for (const ev of ["tick", "trade", "stampede", "opened"]) {
         es.addEventListener(ev, (e) => handlers[ev]?.(JSON.parse(e.data)));
       }
-      es.onerror = () => { es.close(); poll(); };
+      // 浏览器自己会重连，onerror 在 CONNECTING 时也会响。连续失败 3 次，
+      // 或连接被判定 CLOSED，才降级成轮询，避免一场演示丢掉 trade/opened。
+      es.onopen = () => { errs = 0; };
+      es.onerror = () => {
+        if (closed) return;
+        if (es.readyState === EventSource.CLOSED || ++errs >= 3) {
+          es.close();
+          poll();
+        }
+      };
     } catch {
       poll();
     }

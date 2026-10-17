@@ -7,6 +7,7 @@ import { api } from "./api.js";
 
 const VIEM = "https://esm.sh/viem@2.57.7"; // 仅真链模式才加载，断网演示不受影响
 const BURNER_KEY = "alpha.burner";
+const WALLET_KEY = "alpha.wallet";
 
 const ERC20_ABI = [
   { type: "function", name: "approve", stateMutability: "nonpayable", inputs: [{ name: "s", type: "address" }, { name: "a", type: "uint256" }], outputs: [{ type: "bool" }] },
@@ -16,9 +17,11 @@ const ALPHA_ABI = [{ type: "function", name: "buy", stateMutability: "nonpayable
 
 let connected = null; // 钱包地址
 
-/** 免费领取 / mock 购买用的本地身份；连了钱包就用钱包地址 */
+/** 免费领取 / mock 购买用的本地身份；连过钱包就认那个地址，刷新也不退回 burner */
 export function identity() {
   if (connected) return connected;
+  const saved = localStorage.getItem(WALLET_KEY);
+  if (saved) return saved;
   let a = localStorage.getItem(BURNER_KEY);
   if (!a) {
     a = "0x" + [...crypto.getRandomValues(new Uint8Array(20))].map((b) => b.toString(16).padStart(2, "0")).join("");
@@ -29,20 +32,39 @@ export function identity() {
 
 export const hasWallet = () => typeof window.ethereum !== "undefined";
 
+/** 已授权的钱包静默恢复。eth_accounts 不弹窗。 */
+export async function restoreIdentity() {
+  if (!window.ethereum) return connected;
+  try {
+    const [addr] = await window.ethereum.request({ method: "eth_accounts" });
+    if (addr) {
+      connected = addr;
+      localStorage.setItem(WALLET_KEY, addr);
+    }
+  } catch { /* 没装钱包或用户拒绝过，收据仍走 localStorage 里的地址 */ }
+  return connected;
+}
+
 export async function connectWallet() {
   const cfg = await api.config();
   const [addr] = await window.ethereum.request({ method: "eth_requestAccounts" });
   const hexId = "0x" + cfg.chainId.toString(16);
+  const chainParams = {
+    chainId: hexId,
+    chainName: cfg.chainId === 31337 ? "Anvil" : "Monad Testnet",
+    nativeCurrency: { name: "MON", symbol: "MON", decimals: 18 },
+    rpcUrls: [cfg.rpcUrl],
+  };
+  // 本地 anvil 的 explorer 是空串，塞进 blockExplorerUrls 会被钱包拒绝
+  if (cfg.explorer) chainParams.blockExplorerUrls = [cfg.explorer];
   try {
     await window.ethereum.request({ method: "wallet_switchEthereumChain", params: [{ chainId: hexId }] });
   } catch (e) {
     if (e.code !== 4902) throw e;
-    await window.ethereum.request({
-      method: "wallet_addEthereumChain",
-      params: [{ chainId: hexId, chainName: "Monad Testnet", nativeCurrency: { name: "MON", symbol: "MON", decimals: 18 }, rpcUrls: [cfg.rpcUrl], blockExplorerUrls: [cfg.explorer] }],
-    });
+    await window.ethereum.request({ method: "wallet_addEthereumChain", params: [chainParams] });
   }
   connected = addr;
+  localStorage.setItem(WALLET_KEY, addr);
   return addr;
 }
 

@@ -1,13 +1,21 @@
 @import url("tokens.css");
 
 /* ══════════════════════════════════════════════════════════════
-   Alpha Clock · Theme
-   方向：Terminal × Editorial
-   —— 近黑底 / 发丝线 / 等宽数字 / 细字重 / 零圆角 / 零阴影
+   半衰期 · Alpha Clock · Theme
+   方向：Pixel Arcade —— 复古像素游戏
+   —— CRT 深色底 / 硬边框（非半透明）/ 像素字体 / 零圆角 / 硬阴影按下感
    纪律：本文件不出现十六进制颜色，全部走 var()。
+   叙事：普罗米修斯盗火。Halfie 是那团正在冷却的 256 像素火焰本体，
+         Bolt/Rush/Hoot/Lazlo 是四个按买入时机划分的"阵营"。见
+         docs/IP-ART-BRIEF.md。
    ══════════════════════════════════════════════════════════════ */
 
 *, *::before, *::after { box-sizing: border-box; }
+
+/* HTML 的 hidden 属性必须永远赢过任何 display 声明 ——
+   否则 .mobile > #receipt { display:flex } 会让"隐藏的收据"照样占位并撑破布局。
+   这个坑在移动端表现为整页横向溢出、标题被裁。 */
+[hidden] { display: none !important; }
 
 html { background: var(--bg); }
 
@@ -22,22 +30,31 @@ body {
   text-rendering: optimizeLegibility;
 }
 
+/* 像素图统一声明清晰边缘：sprite / Halfie canvas 都靠这条规则，
+   否则浏览器默认的双线性插值会把像素图糊成模糊渐变。
+   任何渐染 sprite 的 img/canvas 都应落在这个选择器下——新增元素时
+   优先靠类名 .pixel-art 挂载，不要散落 inline style。 */
+img, canvas, .pixel-art {
+  image-rendering: pixelated;
+  image-rendering: crisp-edges; /* 老浏览器回退 */
+}
+
 ::selection { background: var(--accent); color: var(--bg); }
 
-a { color: var(--fg); text-decoration: none; border-bottom: 1px solid var(--hair-strong); }
+a { color: var(--fg); text-decoration: none; border-bottom: 1px solid var(--line-strong); }
 a:hover { border-bottom-color: var(--accent); }
 
 code {
-  font-family: var(--num);
-  font-size: .9em;
+  font-family: var(--num-sm);
+  font-size: 1.05em;
   color: var(--fg-2);
   background: var(--surface-2);
-  padding: 1px 5px;
+  padding: 2px 6px;
 }
 
 /* 三级文字工具类 */
 .dim { color: var(--fg-2); }
-.err { color: var(--alert); font-size: var(--t-cap); font-family: var(--num); }
+.err { color: var(--alert); font-size: var(--t-cap); font-family: var(--num-sm); }
 
 /* 焦点：键盘可见，鼠标不打扰 */
 :focus-visible {
@@ -48,66 +65,78 @@ code {
 /* ─────────────── 标题 ─────────────── */
 h1 {
   font-size: var(--t-title);
-  font-weight: 500;
-  letter-spacing: -.02em;
-  line-height: 1.24;
+  font-weight: 600;
+  letter-spacing: -.01em;
+  line-height: 1.3;
   margin: 0 0 var(--s2);
 }
 
 h2 {
   font-size: var(--t-lead);
-  font-weight: 500;
-  letter-spacing: -.01em;
+  font-weight: 600;
   margin: 0 0 var(--s2);
 }
 
-/* 眉标：等宽、大写、宽字距，一条发丝线收尾 */
+/* 眉标：像素等宽、大写、宽字距，硬边框收尾（取代旧发丝线） */
 .eyebrow {
   display: flex;
   align-items: center;
   gap: 12px;
-  font-family: var(--num);
+  font-family: var(--num-sm);
   font-size: var(--t-micro);
-  font-weight: 500;
-  letter-spacing: .16em;
+  letter-spacing: .1em;
   text-transform: uppercase;
   color: var(--fg-3);
   padding-bottom: var(--s2);
-  border-bottom: 1px solid var(--hair);
+  border-bottom: 2px solid var(--line);
 }
 .eyebrow .right { margin-left: auto; }
 
 /* ─────────────── 按钮 ───────────────
-   默认：透明底 + 发丝线框 + 零圆角（编辑排版气质）
-   主 CTA：仅限移动端购买页，实心 accent */
+   零圆角 + 实色底 + 右下硬阴影模拟"悬浮在面板上方"的立体感。
+   :active 时按钮位移到阴影原本的位置、阴影归零——这是经典像素 UI
+   的按下反馈（FC/NES 菜单按钮手法），位移量放大到 3px 让远距离投影
+   也能看清"按下去了"这个动作，不依赖圆角或字重变化。 */
 button {
   font-family: var(--ui);
   font-size: var(--t-body);
-  font-weight: 500;
+  font-weight: 600;
   color: var(--fg);
-  background: transparent;
-  border: 1px solid var(--hair-strong);
+  background: var(--surface-2);
+  border: 2px solid var(--line-strong);
   border-radius: var(--r-none);
-  padding: 13px 22px;
+  padding: 12px 20px;
   cursor: pointer;
-  transition: border-color var(--d-tick) var(--ease),
-              color var(--d-tick) var(--ease),
-              background var(--d-tick) var(--ease);
+  box-shadow: 3px 3px 0 0 var(--line);
+  transition: background var(--d-tick) var(--ease),
+              border-color var(--d-tick) var(--ease),
+              box-shadow var(--d-tick) var(--ease),
+              transform var(--d-tick) var(--ease);
 }
 button:hover { border-color: var(--fg-3); }
-button:active { transform: translateY(1px); }
-button:disabled { opacity: .45; cursor: default; transform: none; }
-button.go { border-color: var(--free); color: var(--free); }
-button.go:hover { background: var(--free); color: var(--bg); }
+button:active {
+  transform: translate(3px, 3px);
+  box-shadow: 0 0 0 0 var(--line);
+}
+button:disabled { opacity: .45; cursor: default; transform: none; box-shadow: 3px 3px 0 0 var(--line); }
+button.go {
+  background: var(--free);
+  color: var(--on-free);
+  border-color: var(--on-free);
+  box-shadow: 3px 3px 0 0 var(--on-free);
+}
+button.go:hover { background: var(--free); }
 
 /* ─────────────── 价格：本产品的主角 ───────────────
-   等宽 + tabular-nums（否则每秒跳动时宽度会抖）+ 细字重 + 收紧字距 */
+   按场景切具名像素字体档位（见 tokens.css 的三档网格密度）。
+   等宽依赖字体几何本身（Fusion Pixel Monospaced），tabular-nums
+   仍声明作无害兜底。 */
 .price {
-  font-family: var(--num);
-  font-size: 72px;
-  font-weight: 250;
-  line-height: .9;
-  letter-spacing: -.045em;
+  font-family: var(--num-sm);
+  font-size: 48px;
+  font-weight: 400;
+  line-height: 1.1;
+  letter-spacing: 0;
   font-variant-numeric: tabular-nums;
   font-feature-settings: "tnum" 1;
   color: var(--price-hot);
@@ -115,27 +144,33 @@ button.go:hover { background: var(--free); color: var(--bg); }
   align-items: baseline;
   transition: color var(--d-temp) linear;
 }
-.price.big { font-size: var(--t-price); }
+.price.big { font-size: var(--t-price); font-family: var(--num-lg); }
 .price.free { color: var(--free); }
 
-/* 逐字符跳动：只给"变了的那一位"加 .chg，120ms 后移除 */
+/* 逐字符硬切换：像素字体最怕非整数倍的亚像素位移（会让硬边字形
+   边缘出现模糊插值），所以不再用 transform 位移抖动，改成"变化的
+   那一位瞬间切换高亮色 + opacity 跳变"，90ms 后弹回——仍是一次性
+   反馈，仍满足 <400ms 的跳动节奏，但不破坏像素网格对齐 */
 .price .d {
   display: inline-block;
-  transition: transform var(--d-tick) var(--ease),
-              opacity var(--d-tick) var(--ease);
+  transition: color var(--d-tick) steps(1),
+              opacity var(--d-tick) steps(1);
 }
-.price .d.chg { transform: translateY(-3px); opacity: .72; }
+.price .d.chg { color: var(--accent); opacity: .55; }
 .price .d.zero { color: var(--fg-3); }
 
 .unit {
-  font-family: var(--num);
+  font-family: var(--num-sm);
   font-size: var(--t-cap);
   color: var(--fg-3);
-  letter-spacing: .1em;
-  margin-left: 12px;
+  letter-spacing: .05em;
+  margin-left: 10px;
 }
 
-/* ─────────────── 曲线 ─────────────── */
+/* ─────────────── 曲线：阶梯折线，不是平滑曲线 ───────────────
+   curve.mjs 的 priceAt() 本质是 32 档阶梯定价（Math.floor 产生台阶），
+   平滑折线是对真实价格行为的美化失真。阶梯折线是诚实地呈现数据，
+   不是为风格而风格。js 层组装 step-after 路径，这里只定样式。 */
 svg { display: block; width: 100%; }
 #spark { height: 56px; color: var(--price-hot); }
 #chart { height: 300px; flex: 1; min-height: 0; }
@@ -143,13 +178,12 @@ svg { display: block; width: 100%; }
 .curve {
   fill: none;
   stroke: var(--price-hot);
-  stroke-width: 2.5;
-  stroke-linejoin: round;
-  stroke-linecap: round;
+  stroke-width: 3;
+  stroke-linejoin: miter;
+  stroke-linecap: square;
 }
-.now { stroke: var(--fg-3); stroke-width: 1; stroke-dasharray: 3 6; }
-.dot { fill: var(--free); }
-/* 成交点：半径 3，不用发光 */
+.now { stroke: var(--fg-3); stroke-width: 2; stroke-dasharray: 4 4; }
+.dot { fill: var(--free); } /* 成交点：小方块（见 js 里 <rect> 而非 <circle>），不发光不描边 */
 
 /* ─────────────── 通用布局 ─────────────── */
 main {
@@ -166,46 +200,47 @@ main {
   margin: var(--s4) 0;
 }
 
-/* KPI：等宽数字 + 小号眉标式标签 */
+/* KPI：像素等宽数字 + 小号眉标式标签 */
 .k {
-  font-family: var(--num);
+  font-family: var(--num-sm);
   font-size: var(--t-micro);
-  letter-spacing: .16em;
+  letter-spacing: .1em;
   text-transform: uppercase;
   color: var(--fg-3);
 }
 .v {
-  font-family: var(--num);
-  font-size: 30px;
-  font-weight: 300;
-  letter-spacing: -.02em;
+  font-family: var(--num-md);
+  font-size: 28px;
+  font-weight: 400;
   font-variant-numeric: tabular-nums;
 }
 
-/* 发丝线分隔 */
-hr, .rule { border: 0; height: 1px; background: var(--hair); margin: var(--s3) 0; }
+/* 硬边框分隔（取代旧发丝线）：不透明实色，像素图从不依赖半透明描边 */
+hr, .rule { border: 0; height: 2px; background: var(--line); margin: var(--s3) 0; }
 
 /* ─────────────── 列表（首页） ─────────────── */
 #list { list-style: none; margin: var(--s4) 0; padding: 0; }
 #list li {
   display: flex;
-  align-items: baseline;
+  align-items: center;
   gap: var(--s2);
   padding: var(--s2) 0;
-  border-bottom: 1px solid var(--hair);
+  border-bottom: 2px solid var(--line);
   font-size: var(--t-body);
   transition: background var(--d-tick) linear;
 }
 #list li:hover { background: var(--surface); }
-#list li a { border-bottom: 0; color: var(--fg-2); font-family: var(--num); font-size: var(--t-cap); }
+#list li a { border-bottom: 0; color: var(--fg-2); font-family: var(--num-sm); font-size: var(--t-cap); }
 #list li a:hover { color: var(--accent); }
+/* 每条信号前的迷你 Halfie 缩略图标：一排"正在冷却的火星" */
+#list li .mini-halfie { width: 20px; height: 20px; flex: none; }
 
 /* ─────────────── 成交流 ─────────────── */
 .feed {
   list-style: none;
   margin: var(--s3) 0 0;
   padding: 0;
-  font-family: var(--num);
+  font-family: var(--num-sm);
   font-size: var(--t-cap);
   font-variant-numeric: tabular-nums;
   color: var(--fg-2);
@@ -214,7 +249,7 @@ hr, .rule { border: 0; height: 1px; background: var(--hair); margin: var(--s3) 0
 }
 .feed li {
   padding: 7px 0;
-  border-bottom: 1px solid var(--hair);
+  border-bottom: 2px solid var(--line);
   animation: slide-in var(--d-panel) var(--ease);
 }
 .feed li:last-child { border-bottom: 0; }
@@ -225,7 +260,7 @@ hr, .rule { border: 0; height: 1px; background: var(--hair); margin: var(--s3) 0
 }
 
 /* ══════════════════════════════════════════════
-   大屏（投影 1920×1080）
+   大屏（投影 1920×1080，PRD 硬指标：5 米外可读主价格）
    ══════════════════════════════════════════════ */
 .screen {
   height: 100vh;
@@ -240,26 +275,25 @@ hr, .rule { border: 0; height: 1px; background: var(--hair); margin: var(--s3) 0
   display: flex;
   align-items: center;
   gap: 14px;
-  font-family: var(--num);
+  font-family: var(--num-md);
   font-size: var(--t-cap);
-  letter-spacing: .16em;
+  letter-spacing: .1em;
   text-transform: uppercase;
   color: var(--fg-2);
   padding-bottom: var(--s2);
-  border-bottom: 1px solid var(--hair);
+  border-bottom: 2px solid var(--line);
 }
 .screen header .brand {
   color: var(--fg);
-  font-weight: 500;
-  letter-spacing: .2em;
+  font-weight: 600;
+  letter-spacing: .15em;
 }
 .screen header .dim { margin-left: auto; }
 
 .screen h1 {
   font-size: var(--t-head);
-  font-weight: 500;
-  letter-spacing: -.02em;
-  line-height: 1.15;
+  font-weight: 600;
+  line-height: 1.2;
   margin: var(--s4) 0 0;
   max-width: 1400px;
 }
@@ -270,10 +304,34 @@ hr, .rule { border: 0; height: 1px; background: var(--hair); margin: var(--s3) 0
   align-items: flex-start;
   flex: 0 0 auto;
 }
-.screen .row > div:first-child { margin-right: auto; }
-.screen .row .v { font-size: var(--t-head); font-weight: 250; letter-spacing: -.03em; }
+.screen .row > div { display: flex; flex-direction: column; align-items: flex-end; }
+.screen .row > div:first-child { margin-right: auto; align-items: flex-start; }
+.screen .unit { font-size: 36px; margin-left: 0; margin-right: 10px; letter-spacing: 0;
+  align-self: flex-start; margin-top: 14px; }
+.screen .k { text-align: right; }
+.screen .row > div:first-child .k { text-align: left; }
+.screen .row .v { font-family: var(--num-lg); font-size: var(--t-head); font-weight: 400; }
 .screen .k { margin-bottom: 2px; }
 .screen #price { margin-bottom: var(--s2); }
+
+/* Halfie 大屏版：和主价格共用同一个 sig 数据源，天然同步掉像素 */
+#halfie-big { width: 220px; height: 220px; margin: var(--s2) 0; }
+
+/* 阵营统计面板：四个阵营图标各配一个计数，复用角色色 token */
+.factions {
+  display: flex;
+  gap: var(--s4);
+  margin-top: var(--s3);
+  padding-top: var(--s3);
+  border-top: 2px solid var(--line);
+}
+.faction { display: flex; align-items: center; gap: var(--s1); }
+.faction img, .faction canvas { width: 28px; height: 28px; }
+.faction .n { font-family: var(--num-md); font-size: 22px; font-variant-numeric: tabular-nums; }
+.faction.bolt  .n { color: var(--c-bolt); }
+.faction.rush  .n { color: var(--c-rush); }
+.faction.hoot  .n { color: var(--c-hoot); }
+.faction.lazlo .n { color: var(--c-lazlo); }
 
 /* 最后一分钟：只让"钱"变红，不整屏染色（整屏红会毁掉投影对比度） */
 .screen.last-minute #price { color: var(--alert); }
@@ -285,20 +343,41 @@ hr, .rule { border: 0; height: 1px; background: var(--hair); margin: var(--s3) 0
 .screen.is-free header { border-bottom-color: var(--free); }
 .screen.is-free .curve { stroke: var(--free); }
 
-/* 终局卡 */
+/* 终局卡：HIGH SCORE 街机榜单 */
 #final {
   margin-top: var(--s5);
-  padding: var(--s4) 0 0;
-  border-top: 1px solid var(--hair-strong);
+  padding: var(--s4);
+  border: 2px solid var(--line-strong);
+  box-shadow: 4px 4px 0 0 var(--line);
 }
-#final h2 { font-size: 28px; }
+#final .score-title {
+  font-family: var(--num-md);
+  font-size: var(--t-cap);
+  letter-spacing: .15em;
+  text-transform: uppercase;
+  color: var(--accent);
+  margin-bottom: var(--s2);
+  border-bottom: 2px solid var(--line);
+  padding-bottom: var(--s1);
+}
+#final h2 { font-size: 26px; }
 #final p { margin: 6px 0; font-size: var(--t-body); color: var(--fg-2); }
-#final b { font-family: var(--num); font-weight: 300; color: var(--fg); font-variant-numeric: tabular-nums; }
+#final b { font-family: var(--num-md); font-weight: 400; color: var(--fg); font-variant-numeric: tabular-nums; }
+/* 榜单行：等宽数字右对齐排列，经典街机高分榜语言 */
+.scoreboard { font-family: var(--num-md); font-size: 18px; margin-top: var(--s2); }
+.scoreboard li {
+  display: flex;
+  justify-content: space-between;
+  padding: 4px 0;
+  border-bottom: 1px solid var(--line);
+  font-variant-numeric: tabular-nums;
+}
+.scoreboard li:last-child { border-bottom: 0; }
 
 .disclaimer {
   margin-top: auto;
   padding-top: var(--s3);
-  border-top: 1px solid var(--hair);
+  border-top: 2px solid var(--line);
   font-size: var(--t-micro);
   color: var(--fg-3);
   line-height: 1.7;
@@ -307,8 +386,8 @@ hr, .rule { border: 0; height: 1px; background: var(--hair); margin: var(--s3) 0
 /* ══════════════════════════════════════════════
    移动端购买页 / 收据
    ══════════════════════════════════════════════ */
-.mobile main,
-.mobile #receipt {
+.mobile > main,
+.mobile > #receipt {
   max-width: 440px;
   margin: 0 auto;
   padding: var(--s5) var(--s3);
@@ -317,50 +396,77 @@ hr, .rule { border: 0; height: 1px; background: var(--hair); margin: var(--s3) 0
   flex-direction: column;
 }
 
-.mobile h1 { font-size: 24px; font-weight: 500; line-height: 1.35; }
-.mobile #price { margin: var(--s4) 0 var(--s2); }
+.mobile h1 { font-size: 22px; font-weight: 600; line-height: 1.4; }
+.mobile #halfie { width: 120px; height: 120px; margin: 0 auto var(--s2); display: block; }
+.mobile #price { margin: var(--s2) 0 var(--s2); }
 .mobile #preview { color: var(--fg-2); font-size: var(--t-body); }
 .mobile #cadence,
 .mobile #wait,
 .mobile #countdown,
 .mobile #social {
-  font-family: var(--num);
+  font-family: var(--num-sm);
   font-size: var(--t-cap);
   color: var(--fg-3);
   margin: 6px 0;
 }
 .mobile #wait { color: var(--fg-2); }
+/* 阵营实时提示：购买前告诉你"现在买属于哪个阵营"，不新增操作步骤，
+   只是 CTA 上方的一行状态文案 */
+.faction-hint {
+  display: flex;
+  align-items: center;
+  gap: var(--s1);
+  font-family: var(--num-sm);
+  font-size: var(--t-cap);
+  margin: var(--s2) 0;
+}
+.faction-hint img, .faction-hint canvas { width: 20px; height: 20px; }
 
-/* 移动端主 CTA：全宽、实心 accent、唯一允许的圆角 */
+/* 移动端主 CTA：全宽、实色、零圆角，立体感靠硬阴影而不是圆角 */
 .mobile #cta {
   margin-top: auto;
   width: 100%;
   height: 56px;
   background: var(--accent);
   color: var(--on-accent);
-  border: 0;
-  border-radius: var(--r-cta);
+  border: 2px solid var(--on-accent);
+  border-radius: var(--r-none);
+  box-shadow: 4px 4px 0 0 var(--line-strong);
   font-size: 17px;
   font-weight: 600;
-  letter-spacing: -.01em;
 }
-.mobile #cta:active { transform: scale(.985); }
-.mobile #cta.go { background: var(--free); color: var(--on-free); }
+.mobile #cta:active { transform: translate(4px, 4px); box-shadow: 0 0 0 0 var(--line-strong); }
+.mobile #cta.go { background: var(--free); color: var(--on-free); border-color: var(--on-free); }
 .mobile #cta:disabled { opacity: .5; }
 
-/* 收据：不是卡片，是一张小票 */
+/* 收据：街机 HIGH SCORE 小票，顶部撕口纹理用纯 CSS 锯齿裁切 */
 #receipt {
   background: var(--surface);
+  border: 2px solid var(--line-strong);
+  clip-path: polygon(
+    0% 12px, 4% 0, 8% 12px, 12% 0, 16% 12px, 20% 0, 24% 12px, 28% 0, 32% 12px, 36% 0,
+    40% 12px, 44% 0, 48% 12px, 52% 0, 56% 12px, 60% 0, 64% 12px, 68% 0, 72% 12px, 76% 0,
+    80% 12px, 84% 0, 88% 12px, 92% 0, 96% 12px, 100% 0,
+    100% 100%, 0% 100%
+  );
+  padding-top: calc(var(--s5) + 12px);
 }
-#receipt h2 { font-size: var(--t-lead); font-weight: 500; }
+#receipt .rank-badge {
+  display: flex;
+  align-items: center;
+  gap: var(--s1);
+  margin-bottom: var(--s2);
+}
+#receipt .rank-badge img, #receipt .rank-badge canvas { width: 24px; height: 24px; }
+#receipt h2 { font-size: var(--t-lead); font-weight: 600; }
 #receipt dl { margin: var(--s3) 0; padding: 0; }
 #receipt dl > div,
 #receipt dt, #receipt dd { display: inline; }
 #receipt dt {
   display: block;
-  font-family: var(--num);
+  font-family: var(--num-sm);
   font-size: var(--t-micro);
-  letter-spacing: .16em;
+  letter-spacing: .1em;
   text-transform: uppercase;
   color: var(--fg-3);
   margin-top: var(--s2);
@@ -368,21 +474,20 @@ hr, .rule { border: 0; height: 1px; background: var(--hair); margin: var(--s3) 0
 #receipt dd {
   display: block;
   margin: 2px 0 0;
-  font-family: var(--num);
-  font-size: 26px;
-  font-weight: 300;
-  letter-spacing: -.02em;
+  font-family: var(--num-md);
+  font-size: 24px;
+  font-weight: 400;
   font-variant-numeric: tabular-nums;
 }
 #receipt pre {
-  font-family: var(--num);
+  font-family: var(--num-sm);
   font-size: 13px;
-  line-height: 1.75;
+  line-height: 1.8;
   color: var(--fg-2);
   white-space: pre-wrap;
   word-break: break-word;
-  border-top: 1px solid var(--hair-strong);
-  border-bottom: 1px solid var(--hair-strong);
+  border-top: 2px solid var(--line-strong);
+  border-bottom: 2px solid var(--line-strong);
   padding: var(--s2) 0;
   margin: var(--s3) 0;
 }
@@ -394,7 +499,7 @@ label {
   display: block;
   margin: var(--s3) 0;
   font-size: var(--t-cap);
-  letter-spacing: .02em;
+  letter-spacing: .01em;
   color: var(--fg-2);
 }
 input:not([type="radio"]):not([type="checkbox"]),
@@ -402,32 +507,31 @@ textarea {
   display: block;
   width: 100%;
   margin-top: var(--s1);
-  padding: 12px 0;
+  padding: 12px;
   font-family: var(--ui);
   font-size: var(--t-body);
   color: var(--fg);
-  background: transparent;
-  border: 0;
-  border-bottom: 1px solid var(--hair-strong);
+  background: var(--surface);
+  border: 2px solid var(--line);
   border-radius: 0;
   transition: border-color var(--d-tick) linear;
 }
 input:focus, textarea:focus {
   outline: none;
-  border-bottom-color: var(--accent);
+  border-color: var(--accent);
 }
 textarea { resize: vertical; line-height: 1.7; }
 
 fieldset {
-  border: 1px solid var(--hair);
+  border: 2px solid var(--line);
   border-radius: 0;
   padding: var(--s2) var(--s3);
   margin: var(--s4) 0;
 }
 legend {
-  font-family: var(--num);
+  font-family: var(--num-sm);
   font-size: var(--t-micro);
-  letter-spacing: .16em;
+  letter-spacing: .1em;
   text-transform: uppercase;
   color: var(--fg-3);
   padding: 0 var(--s1);
@@ -448,9 +552,10 @@ input[type="radio"], input[type="checkbox"] { accent-color: var(--accent); margi
 
 @media (max-width: 720px) {
   main { padding: var(--s5) var(--s3) var(--s6); }
-  h1 { font-size: 26px; }
-  .price.big { font-size: 88px; }
+  h1 { font-size: 24px; }
+  .price.big { font-size: 72px; }
   .screen { padding: var(--s4) var(--s3); }
-  .screen h1 { font-size: 26px; }
+  .screen h1 { font-size: 24px; }
   .screen .row { gap: var(--s3); }
+  #halfie-big { width: 140px; height: 140px; }
 }

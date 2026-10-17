@@ -1,28 +1,87 @@
 /* ══════════════════════════════════════════════════════════════
-   Alpha Clock · Design Tokens
+   半衰期 · Alpha Clock · Design Tokens
+   方向：复古像素游戏（Pixel Arcade），叙事见 docs/IP-ART-BRIEF.md
+   （普罗米修斯盗火 / Halfie & Friends）
+
    唯一允许出现十六进制颜色的文件。其余 CSS 一律用 var()。
-   修改视觉方向 = 只改本文件的 12 个颜色 + 4 个字号，不准改 theme.css。
+   修改视觉方向 = 只改本文件，不准改 theme.css 的组件实现。
+
+   注意，六色冻结 ——「价格失温四级 + 归零青绿 + Halfie 致敬紫」已经
+   像素级画进 frontend/assets/sprites/*.png（六张已验收真图），
+   不是 CSS 渲染出来的，改这六个值对已生成的图片毫无作用，只会让
+   UI 和 IP 图在同一屏幕上并排出现刺眼色差。这六个值永久冻结：
+   --price-hot / --price-mid / --price-cool / --price-dead / --free /
+   --halfie-outline。任何"调色板美化"提案都不能碰它们，新色板的
+   高饱和 NES 式对比方向只施加在冻结色之外的 token 上。
    ══════════════════════════════════════════════════════════════ */
 
-:root {
-  /* ── 表面（由深到浅，只有三级，不要发明第四级） ── */
-  --bg:        #08090A;
-  --surface:   #101113;
-  --surface-2: #16181B;
+/* ── 像素字体：Fusion Pixel（SIL OFL 1.1，frontend/fonts/OFL-fusion-pixel.txt）
+   按语言子集拆分 woff2，zh_hans 覆盖中文，latin 覆盖数字/英文/符号——
+   两个 @font-face 用同一个 font-family 名，浏览器按字符自动选子集，
+   不需要在 CSS 里手动切换。
+   三档网格密度，网格越大，等比放大后笔画越粗越不糊：
+     12px → 大屏主价格（5 米可读硬指标，PRD §9.3）
+     10px → 大屏次级数字（KPI、成交流）
+      8px → 购买页 / 表单 / 法务等小字号场景
+   「Monospaced」是字体几何层面的固定字符宽度，不依赖 OpenType tnum
+   特性生效；CSS 仍声明 font-variant-numeric: tabular-nums 作为无害
+   兜底（见 theme.css .price），实际生效机制是这个字体家族本身。 ── */
+@font-face {
+  font-family: "Fusion Pixel 12px";
+  src: url("../fonts/fusion-pixel-12px-monospaced-zh_hans.woff2") format("woff2");
+  unicode-range: U+4E00-9FFF, U+3000-303F, U+FF00-FFEF;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Fusion Pixel 12px";
+  src: url("../fonts/fusion-pixel-12px-monospaced-latin.woff2") format("woff2");
+  font-display: swap;
+}
+@font-face {
+  font-family: "Fusion Pixel 10px";
+  src: url("../fonts/fusion-pixel-10px-monospaced-zh_hans.woff2") format("woff2");
+  unicode-range: U+4E00-9FFF, U+3000-303F, U+FF00-FFEF;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Fusion Pixel 10px";
+  src: url("../fonts/fusion-pixel-10px-monospaced-latin.woff2") format("woff2");
+  font-display: swap;
+}
+@font-face {
+  font-family: "Fusion Pixel 8px";
+  src: url("../fonts/fusion-pixel-8px-monospaced-zh_hans.woff2") format("woff2");
+  unicode-range: U+4E00-9FFF, U+3000-303F, U+FF00-FFEF;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Fusion Pixel 8px";
+  src: url("../fonts/fusion-pixel-8px-monospaced-latin.woff2") format("woff2");
+  font-display: swap;
+}
 
-  /* ── 发丝线：本设计用 1px 线做分隔，不用阴影、不用卡片 ── */
-  --hair:        rgba(255, 255, 255, .08);
-  --hair-strong: rgba(255, 255, 255, .14);
+:root {
+  /* ── 表面三级：CRT 式深蓝黑，级差比旧版拉大，像游戏窗口的正式分层 ── */
+  --bg:        #07080C;
+  --surface:   #11131A;
+  --surface-2: #1B1E27;
+
+  /* ── 硬边框（取代旧版半透明发丝线）：不透明实色，像素图从不依赖
+     半透明描边——半透明会在放大/投影时产生抗锯齿感，违反硬边块状原则 ── */
+  --line:        #2A2E3A;
+  --line-strong: #3C4152;
 
   /* ── 文字三级 ── */
-  --fg:   #F2F3F5;
-  --fg-2: #8A8F98;
-  --fg-3: #5C616B;
+  --fg:   #F4F4F2;
+  --fg-2: #9196A8;
+  --fg-3: #5B5F70;
 
-  /* ── 品牌动作色（只用于 CTA、选中态、live 指示灯） ── */
-  --accent: #C8FF3D;
+  /* ── 品牌动作色：街机霓虹感，只用于 CTA / 选中态 / live 指示灯 ── */
+  --accent: #D4FF3D;
 
-  /* ── 价格"失温"四级：这是本产品的签名动作，不要挪用 ──
+  /* ── [冻结 1/2] 价格"失温"四级 + 归零青绿 ──
+     已画进 sprites/halfie.png 与 halfie-free.png 的同心圆分层，
+     像素级锁定，禁止调整。
      ≥50% 琥珀 → 20–50% 暗金 → 5–20% 灰 → <5% 深灰 → 归零青绿 */
   --price-hot:  #FFC53D;
   --price-mid:  #D9A63C;
@@ -30,40 +89,68 @@
   --price-dead: #6E747E;
   --free:       #3DDC97;
 
+  /* ── [冻结 2/2] Halfie 专属致敬紫描边 ──
+     已画进 sprites/halfie.png 的外轮廓描边，像素级锁定。
+     唯一允许在 UI 里出现的"非价格语义"强调色，只用于 Halfie 相关
+     的像素描边/高亮，不作为通用 accent 使用。 ── */
+  --halfie-outline: #8B5CF6;
+
+  /* ── 阵营色：故意复用上面的冻结色，不是偷懒——每个角色的 sprite
+     本来就是按"买入时的价格温度"配色的（Bolt 买在最热，Lazlo 买在
+     归零），阵营徽章颜色与角色图保持像素级一致是叙事正确性 ── */
+  --c-bolt:  var(--fg);         /* 雷霆碎片，近白 */
+  --c-rush:  var(--price-mid);  /* 狐狸，暗金 */
+  --c-hoot:  var(--price-cool); /* 猫头鹰，冷灰 */
+  --c-lazlo: var(--free);       /* 树懒，青绿 */
+
   /* ── 警示（晚 60 秒、错误、失效） ── */
   --alert: #FF5C3D;
 
-  /* ── 实心块上的"墨色"文字（唯一允许的两种反白） ── */
+  /* ── 实心块上的反白文字 ── */
   --on-accent: #0A0B0C;
   --on-free:   #04120C;
+  --on-alert:  #1A0604;
 
-  /* ── 字体：Geist 需自备 woff2，缺失时回落到系统等宽/黑体 ── */
-  --num: "Geist Mono", ui-monospace, "SF Mono", "JetBrains Mono", Menlo, monospace;
-  --ui:  "Geist Sans", -apple-system, "PingFang SC", "Noto Sans SC", system-ui, sans-serif;
+  /* ── 字体 ──
+     --num 按场景用具名字体变量（见下），不走单一 fallback 链：
+     大屏和购买页需要不同网格密度的不同字体文件，不能指望一条
+     font-family 链自动切换粗细/密度。
+     --ui 中文正文仍用系统黑体——像素字体逐字符都是硬边块，大段
+     正文用它会牺牲可读性，只在"数字/短句/标题"场景用像素字体。 ── */
+  --num-lg: "Fusion Pixel 12px", ui-monospace, monospace; /* 大屏主价格 */
+  --num-md: "Fusion Pixel 10px", ui-monospace, monospace; /* KPI / 成交流 */
+  --num-sm: "Fusion Pixel 8px",  ui-monospace, monospace; /* 购买页 / 表单 / 法务 */
+  --num:    var(--num-sm); /* 兼容旧引用的默认档位 */
+  --ui:     -apple-system, "PingFang SC", "Noto Sans SC", system-ui, sans-serif;
 
-  /* ── 字阶（px）：只有这 7 档，禁止即兴写 font-size ── */
-  --t-micro: 10px;   /* 眉标、单位、法务 */
-  --t-cap:   12px;   /* 说明、KPI 标签 */
-  --t-body:  15px;   /* 正文 */
-  --t-lead:  20px;   /* 段落标题、收据标题 */
-  --t-title: 34px;   /* 页面标题（手机） */
-  --t-head:  44px;   /* 大屏标题 */
-  --t-price: 148px;  /* 大屏价格 */
+  /* ── 字阶（px）：7 档不变，像素字体在非整数倍字号下会出现子像素
+     模糊，但 Fusion Pixel 本身是矢量轮廓字体（基于像素网格设计，
+     不是位图），常规字号缩放不受位图字体的整数倍限制 ── */
+  --t-micro: 10px;
+  --t-cap:   12px;
+  --t-body:  15px;
+  --t-lead:  20px;
+  --t-title: 34px;
+  --t-head:  44px;
+  --t-price: 148px;
 
-  /* ── 字重：只用 250 / 300 / 400 / 500 / 600 ──
-     数字用 250–300，中文用 500，按钮用 600。禁用 700/900。 ── */
+  /* ── 字重：像素字体通常只有 400（无真正粗体变体，虚拟加粗会破坏
+     像素网格对齐），中文 UI 文字沿用系统黑体的 500/600 ── */
 
-  /* ── 间距：8 的倍数 ── */
+  /* ── 间距：8 的倍数，不变 ── */
   --s1: 8px;  --s2: 16px; --s3: 24px; --s4: 32px;
   --s5: 48px; --s6: 64px; --s7: 96px;
 
-  /* ── 动效：只有三条曲线 ── */
+  /* ── 动效：价格变色改用硬切换（颜色/opacity 瞬变）取代位移抖动——
+     像素字体最怕非整数倍的亚像素位移，会让硬边字形出现模糊插值 ── */
   --ease:      cubic-bezier(.2, .8, .2, 1);
-  --d-tick:    120ms;  /* 数字单字符抖动 */
-  --d-temp:    280ms;  /* 价格变色（必须 < 400ms 跳动间隔，否则颜色追不上价格） */
+  --d-tick:    90ms;   /* 数字单字符硬切换 */
+  --d-temp:    280ms;  /* 价格变色（必须 < 400ms 跳动间隔） */
   --d-panel:   450ms;  /* 面板/横幅展开 */
 
-  /* ── 圆角：全局 0。唯一例外：移动端主 CTA 10px、状态点 50% ── */
+  /* ── 圆角：全局恒为 0，不再有例外 ──
+     旧版移动端主 CTA 的 10px 圆角例外已取消：10px 的阶梯伪圆角在
+     这个尺寸下和直角几乎无法分辨，按钮的立体感改用硬阴影位移表达
+     （见 theme.css button），不依赖圆角。 ── */
   --r-none: 0;
-  --r-cta:  10px;
 }
