@@ -5,15 +5,20 @@
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>半衰期 · Alpha Clock</title>
 <link rel="stylesheet" href="css/base.css" />
+<script>
+  if (!/^(localhost|127\.0\.0\.1|\[::1\]|0\.0\.0\.0)$/.test(location.hostname)) {
+    document.documentElement.classList.add("deployed");
+  }
+</script>
 </head>
 <body>
 <main>
   <h1>火种离开奥林匹斯，开始冷却。</h1>
   <p class="dim">每一条信号都是一团叫 Halfie 的火。它一离开众神就开始变冷，每 400 毫秒少一颗火星。越早伸手，火越烫，代价也越高。最后一颗火星飘走之后，它属于所有人。</p>
-  <p class="dim">后端：<code id="base"></code> <span id="mode"></span></p>
+  <p class="dim dev-only">后端：<code id="base"></code> <span id="mode"></span></p>
   <ul id="list"></ul>
   <p><a href="publish.html">把下一团火带下山</a></p>
-  <p class="dim">切换后端：在任意页面地址后加 <code>?api=http://主机:4030</code>（会记住），<code>?api=reset</code> 恢复同源。</p>
+  <p class="dim dev-only">切换后端：在任意页面地址后加 <code>?api=http://主机:4030</code>（会记住），<code>?api=reset</code> 恢复同源。</p>
 </main>
 <script type="module">
 import { api } from "./js/api.js";

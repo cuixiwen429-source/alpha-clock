@@ -676,6 +676,21 @@ export function createApp(ctx: AppContext) {
     });
   }));
 
+  // 单服务上线：SERVE_FRONTEND=1 时后端顺便托管 frontend/。
+  // 页面和 API 同源 → 不用配 CORS、页面不用带 ?api= 指向后端，
+  // 评委点一个链接就能玩；本地开发仍然走 mock / 独立静态服务，行为不变。
+  if (process.env.SERVE_FRONTEND === "1") {
+    const webDir = resolve(ROOT, "../frontend");
+    app.use(express.static(webDir, { extensions: ["html"], maxAge: "1h" }));
+    // mock 的链接是 /s/1、/live/1 这种形态，这里对齐，避免上线后链接风格两套
+    app.get("/s/:id", (req, res) => {
+      res.redirect(302, `/s.html?id=${encodeURIComponent(req.params.id)}`);
+    });
+    app.get("/live/:id", (req, res) => {
+      res.redirect(302, `/live.html?id=${encodeURIComponent(req.params.id)}`);
+    });
+  }
+
   app.use((_req, _res, next) => next(new ApiError(404, "NOT_FOUND", "接口不存在")));
   app.use((error: unknown, _req: Request, res: Response, _next: NextFunction) => {
     if (error instanceof ApiError) {
