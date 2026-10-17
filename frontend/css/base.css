@@ -5,3 +5,7 @@
 
 /* Halfie 掉像素组件（IP Lab / 购买页共用），不影响既有 theme.css */
 #halfie { image-rendering: pixelated; display: block; margin: 0 auto 8px; }
+
+/* 非本机访问（真正上线）时藏掉联调用的后端地址与 ?api= 说明。
+   index.html 的头部脚本按 hostname 判断后给 <html> 加 .deployed。 */
+.deployed .dev-only { display: none; }

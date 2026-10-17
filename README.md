@@ -68,6 +68,36 @@ git clone --recurse-submodules <repo>
 git submodule update --init --recursive
 ```
 
+## 部署（Monad 测试网）
+
+测试网已部署并验证：`chainId 10143`，合约 `0x7a30Cc771d51C4fE5586209843A5Cd50cfE055d8`
+（部署块 `71778113`，广播记录见 `backend/contracts/broadcast/Deploy.s.sol/10143/`），
+USDC 用链上真币 `0xc64b5C61B5c11859b72c7fc69D69b0bc15155e48`。
+
+一个进程同时托管页面和 API（同源，不用配 CORS、页面不用带 `?api=`）：
+
+```bash
+cd backend
+set -a; source .env; set +a
+SERVE_FRONTEND=1 npm run serve        # http://127.0.0.1:4030/ 首页
+```
+
+必需的环境变量（`backend/.env`）：
+
+| 变量 | 说明 |
+|---|---|
+| `NETWORK` | `monad-testnet` |
+| `MONAD_RPC_URL` | 主 RPC。官方节点并发下会 ECONNRESET，后端已带重试 |
+| `MONAD_RPC_FALLBACKS` | 备用 RPC，逗号分隔（默认 thirdweb / ankr 兜底） |
+| `RPC_RETRY` / `RPC_TIMEOUT_MS` | 重试次数 / 单次超时，默认 4 / 15000 |
+| `PRIVATE_KEY` | 平台代发 `publish()` 用 |
+| `PUBLIC_APP_URL` | 发布成功后返回的分享链接前缀 |
+
+`backend/contracts/deployments.json` 不进 git（避免把本机 anvil 地址带出去），
+新机器上要先 `cd backend && npm run deploy:testnet` 或手写该文件指向测试网合约。
+
+验收：`node shared/check-contract.mjs http://127.0.0.1:4030 <signalId>` 应 14/14 通过。
+
 ## 合规
 
 本项目为测试网演示，不构成投资建议。内容将在 8 个半衰期后永久免费公开。不做中国大陆地区经营性推广。

@@ -8,6 +8,8 @@ node_modules
 backend/contracts/out/
 backend/contracts/cache/
 backend/contracts/broadcast/*/31337/
+# 演练用的 dry-run 产物不提交；真广播的 run-latest.json 保留，作为测试网部署凭证
+backend/contracts/broadcast/**/dry-run/
 
 # 运行时
 *.log
