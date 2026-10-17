@@ -32,11 +32,11 @@ body {
 
 /* 像素图统一声明清晰边缘：sprite / Halfie canvas 都靠这条规则，
    否则浏览器默认的双线性插值会把像素图糊成模糊渐变。
-   任何渐染 sprite 的 img/canvas 都应落在这个选择器下——新增元素时
-   优先靠类名 .pixel-art 挂载，不要散落 inline style。 */
+   不认识 pixelated 的老浏览器会丢掉第二条，留下 crisp-edges。
+   两条都认识的浏览器用最后一条，所以 pixelated 必须写在后面。 */
 img, canvas, .pixel-art {
+  image-rendering: crisp-edges;
   image-rendering: pixelated;
-  image-rendering: crisp-edges; /* 老浏览器回退 */
 }
 
 ::selection { background: var(--accent); color: var(--bg); }
@@ -173,7 +173,7 @@ button.go:hover { background: var(--free); }
    不是为风格而风格。js 层组装 step-after 路径，这里只定样式。 */
 svg { display: block; width: 100%; }
 #spark { height: 56px; color: var(--price-hot); }
-#chart { height: 300px; flex: 1; min-height: 0; }
+#chart { height: 300px; flex: 1 1 180px; min-height: 160px; }
 
 .curve {
   fill: none;
@@ -234,6 +234,7 @@ hr, .rule { border: 0; height: 2px; background: var(--line); margin: var(--s3) 0
 #list li a:hover { color: var(--accent); }
 /* 每条信号前的迷你 Halfie 缩略图标：一排"正在冷却的火星" */
 #list li .mini-halfie { width: 20px; height: 20px; flex: none; }
+#list li .sig { flex: 1; min-width: 0; }
 
 /* ─────────────── 成交流 ─────────────── */
 .feed {

@@ -3,184 +3,170 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>Alpha Clock · 组件集 / Opus 参照页</title>
+<title>Alpha Clock · 组件集 / 像素参照页</title>
 <link rel="stylesheet" href="css/base.css" />
 <style>
-/* 仅本页的陈列排版：把组件竖着摆开，不属于产品视觉 */
+/* 仅本页的陈列排版。产品视觉以 tokens.css / theme.css 为准。 */
 .kit { max-width: 1180px; margin: 0 auto; padding: 56px 32px 120px; }
 .kit-sec { margin-top: 72px; }
 .kit-h {
-  font-family: var(--num); font-size: 10px; letter-spacing: .18em; text-transform: uppercase;
+  font-family: var(--num-sm); font-size: var(--t-micro); letter-spacing: .18em; text-transform: uppercase;
   color: var(--fg-3); display: flex; align-items: center; gap: 12px; margin-bottom: 28px;
 }
-.kit-h::after { content: ""; flex: 1; height: 1px; background: var(--hair); }
-.kit-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 1px; background: var(--hair); border: 1px solid var(--hair); }
+.kit-h::after { content: ""; flex: 1; height: 2px; background: var(--line); }
+.kit-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 2px; background: var(--line); border: 2px solid var(--line); }
 .kit-cell { background: var(--bg); padding: 22px; }
-.kit-note { font-family: var(--num); font-size: 10px; color: var(--fg-3); margin-top: 10px; letter-spacing: .06em; }
-.sw { height: 64px; display: flex; align-items: flex-end; padding: 8px; font-family: var(--num); font-size: 9px; border: 1px solid var(--hair); }
-.screen-box { border: 1px solid var(--hair-strong); background: var(--bg); }
-.mobile-box { width: 400px; max-width: 100%; border: 1px solid var(--hair-strong); }
+.kit-note { font-family: var(--num-sm); font-size: var(--t-micro); color: var(--fg-3); margin-top: 10px; letter-spacing: .04em; }
+.sw { height: 64px; display: flex; align-items: flex-end; padding: 8px; font-family: var(--num-sm); font-size: var(--t-micro); border: 2px solid var(--line-strong); }
+.sw.frozen { box-shadow: inset 0 0 0 2px var(--halfie-outline); }
+.screen-box { border: 2px solid var(--line-strong); background: var(--bg); }
+.mobile-box { width: 400px; max-width: 100%; border: 2px solid var(--line-strong); }
+.scale { border-top: 2px solid var(--line); }
+.scale > div { display: flex; align-items: baseline; gap: 24px; padding: 14px 0; border-bottom: 2px solid var(--line); }
+.scale .kit-note { width: 220px; margin-top: 0; flex: none; }
+button.buy { width: 100%; background: var(--accent); color: var(--on-accent); border-color: var(--on-accent); }
+.cast { display: flex; flex-wrap: wrap; gap: 24px; }
+.cast figure { margin: 0; width: 140px; }
+.cast canvas { width: 64px; height: 64px; display: block; background: var(--surface); }
+.cast figcaption { margin-top: 8px; font-family: var(--num-sm); font-size: var(--t-cap); }
+.sizes { width: 100%; border-collapse: collapse; }
+.sizes th, .sizes td { text-align: left; padding: 10px 12px; border-bottom: 2px solid var(--line); font-weight: 400; }
+.sizes th { font-family: var(--num-sm); font-size: var(--t-micro); color: var(--fg-3); letter-spacing: .08em; }
 </style>
 </head>
 <body>
 <div class="kit">
 
-  <div class="eyebrow"><span>Alpha Clock</span><span class="right">Component Kit · v1.0</span></div>
+  <div class="eyebrow"><span>Alpha Clock</span><span class="right">Pixel Kit · Halfie</span></div>
   <h1 style="margin-top:24px">组件集</h1>
   <p class="dim" style="max-width:640px">
-    这一页不是产品，是<b style="color:var(--fg)">唯一权威参照</b>。改任何页面前先看这里；页面里没有的组件，不许自己发明。
+    这一页不是产品，是<b style="color:var(--fg)">唯一权威参照</b>。改任何页面前先看这里。六色冻结已经画进精灵图，参照页只展示，不提议改色。
   </p>
 
-  <!-- ══════ 1 颜色 ══════ -->
   <section class="kit-sec">
-    <div class="kit-h">01 / 颜色（只准用这 12 个）</div>
+    <div class="kit-h">01 / 色板 · 可改的表面</div>
     <div class="kit-grid">
-      <div class="kit-cell"><div class="sw" style="background:var(--bg)">--bg #08090A</div><div class="kit-note">页面底色</div></div>
-      <div class="kit-cell"><div class="sw" style="background:var(--surface)">--surface #101113</div><div class="kit-note">收据 / 悬停行</div></div>
-      <div class="kit-cell"><div class="sw" style="background:var(--surface-2)">--surface-2 #16181B</div><div class="kit-note">行内代码底</div></div>
-      <div class="kit-cell"><div class="sw" style="background:var(--fg);color:var(--bg)">--fg #F2F3F5</div><div class="kit-note">主文字</div></div>
-      <div class="kit-cell"><div class="sw" style="background:var(--fg-2);color:var(--bg)">--fg-2 #8A8F98</div><div class="kit-note">次要文字</div></div>
-      <div class="kit-cell"><div class="sw" style="background:var(--fg-3);color:var(--bg)">--fg-3 #5C616B</div><div class="kit-note">标签 / 法务</div></div>
-      <div class="kit-cell"><div class="sw" style="background:var(--accent);color:var(--bg)">--accent #C8FF3D</div><div class="kit-note">只给 CTA / live 点</div></div>
-      <div class="kit-cell"><div class="sw" style="background:var(--price-hot);color:var(--bg)">--price-hot #FFC53D</div><div class="kit-note">价格 ≥50%</div></div>
-      <div class="kit-cell"><div class="sw" style="background:var(--price-cool);color:var(--bg)">--price-cool #8E939C</div><div class="kit-note">价格 5–20%</div></div>
-      <div class="kit-cell"><div class="sw" style="background:var(--free);color:var(--bg)">--free #3DDC97</div><div class="kit-note">归零 / 领取</div></div>
-      <div class="kit-cell"><div class="sw" style="background:var(--alert);color:var(--bg)">--alert #FF5C3D</div><div class="kit-note">最后一分钟 / 错误</div></div>
-      <div class="kit-cell"><div class="sw" style="background:var(--bg);border-color:var(--hair-strong)">--hair 8% / --hair-strong 14%</div><div class="kit-note">发丝线：分隔一切，不用阴影</div></div>
+      <div class="kit-cell"><div class="sw" style="background:var(--bg)">--bg</div><div class="kit-note">CRT 底</div></div>
+      <div class="kit-cell"><div class="sw" style="background:var(--surface)">--surface</div><div class="kit-note">面板</div></div>
+      <div class="kit-cell"><div class="sw" style="background:var(--surface-2)">--surface-2</div><div class="kit-note">抬起的块</div></div>
+      <div class="kit-cell"><div class="sw" style="background:var(--fg);color:var(--bg)">--fg</div><div class="kit-note">主文字</div></div>
+      <div class="kit-cell"><div class="sw" style="background:var(--fg-2);color:var(--bg)">--fg-2</div><div class="kit-note">次要文字</div></div>
+      <div class="kit-cell"><div class="sw" style="background:var(--fg-3);color:var(--bg)">--fg-3</div><div class="kit-note">标签 / 法务</div></div>
+      <div class="kit-cell"><div class="sw" style="background:var(--accent);color:var(--on-accent)">--accent</div><div class="kit-note">只给 CTA / live 点</div></div>
+      <div class="kit-cell"><div class="sw" style="background:var(--alert);color:var(--on-alert)">--alert</div><div class="kit-note">最后一分钟 / 错误</div></div>
+      <div class="kit-cell"><div class="sw" style="background:var(--bg);border-color:var(--line-strong)">--line / --line-strong</div><div class="kit-note">2px 不透明硬边框，不再用发丝线</div></div>
     </div>
   </section>
 
-  <!-- ══════ 2 字阶 ══════ -->
   <section class="kit-sec">
-    <div class="kit-h">02 / 字阶（7 档，禁止即兴 font-size）</div>
-    <div style="border-top:1px solid var(--hair)">
-      <div style="display:flex;align-items:baseline;gap:24px;padding:14px 0;border-bottom:1px solid var(--hair)">
-        <span class="kit-note" style="width:150px">--t-price 148 / 250</span>
-        <span style="font-family:var(--num);font-size:64px;font-weight:250;letter-spacing:-.045em;color:var(--price-hot)">$ 8.23</span>
-      </div>
-      <div style="display:flex;align-items:baseline;gap:24px;padding:14px 0;border-bottom:1px solid var(--hair)">
-        <span class="kit-note" style="width:150px">--t-head 44 / 500</span>
-        <span style="font-size:44px;font-weight:500;letter-spacing:-.02em">某地址 12 分钟前把 4.2M USDC</span>
-      </div>
-      <div style="display:flex;align-items:baseline;gap:24px;padding:14px 0;border-bottom:1px solid var(--hair)">
-        <span class="kit-note" style="width:150px">--t-title 34 / 500</span>
-        <span style="font-size:34px;font-weight:500;letter-spacing:-.02em">这条消息每 3.8 秒便宜一点</span>
-      </div>
-      <div style="display:flex;align-items:baseline;gap:24px;padding:14px 0;border-bottom:1px solid var(--hair)">
-        <span class="kit-note" style="width:150px">--t-lead 20 / 500</span>
-        <span style="font-size:20px;font-weight:500">你是第 41 个知道的</span>
-      </div>
-      <div style="display:flex;align-items:baseline;gap:24px;padding:14px 0;border-bottom:1px solid var(--hair)">
-        <span class="kit-note" style="width:150px">--t-body 15 / 400</span>
-        <span style="font-size:15px;color:var(--fg-2)">正文。信息是可以被定价的，只要它足够早。</span>
-      </div>
-      <div style="display:flex;align-items:baseline;gap:24px;padding:14px 0;border-bottom:1px solid var(--hair)">
-        <span class="kit-note" style="width:150px">--t-cap 12 num</span>
-        <span style="font-family:var(--num);font-size:12px;color:var(--fg-3);letter-spacing:.1em">BOUGHT · $ 7.71 · 41S</span>
-      </div>
-      <div style="display:flex;align-items:baseline;gap:24px;padding:14px 0">
-        <span class="kit-note" style="width:150px">--t-micro 10 num</span>
-        <span style="font-family:var(--num);font-size:10px;color:var(--fg-3);letter-spacing:.18em;text-transform:uppercase">SIGNAL #001 · MONAD TESTNET</span>
-      </div>
+    <div class="kit-h">02 / 六色冻结 · 不许动</div>
+    <p class="dim">这六个值已经画进 <code>assets/sprites</code>。改 token 不会改图片，只会让 UI 和角色并排时跳色。</p>
+    <div class="kit-grid">
+      <div class="kit-cell"><div class="sw frozen" style="background:var(--price-hot);color:var(--on-accent)">--price-hot</div><div class="kit-note">#FFC53D · 价格 ≥50% · Bolt 的热</div></div>
+      <div class="kit-cell"><div class="sw frozen" style="background:var(--price-mid);color:var(--on-accent)">--price-mid</div><div class="kit-note">#D9A63C · 20–50% · Rush</div></div>
+      <div class="kit-cell"><div class="sw frozen" style="background:var(--price-cool);color:var(--bg)">--price-cool</div><div class="kit-note">#8E939C · 5–20% · Hoot</div></div>
+      <div class="kit-cell"><div class="sw frozen" style="background:var(--price-dead);color:var(--fg)">--price-dead</div><div class="kit-note">#6E747E · &lt;5%</div></div>
+      <div class="kit-cell"><div class="sw frozen" style="background:var(--free);color:var(--on-free)">--free</div><div class="kit-note">#3DDC97 · 归零 · Lazlo</div></div>
+      <div class="kit-cell"><div class="sw frozen" style="background:var(--halfie-outline);color:var(--fg)">--halfie-outline</div><div class="kit-note">#8B5CF6 · 只描 Halfie，不是通用强调色</div></div>
+    </div>
+    <div class="kit-grid" style="margin-top:2px">
+      <div class="kit-cell"><div class="sw" style="background:var(--c-bolt);color:var(--bg)">--c-bolt</div><div class="kit-note">第 1 个半衰期内。我比你们早。</div></div>
+      <div class="kit-cell"><div class="sw" style="background:var(--c-rush);color:var(--on-accent)">--c-rush</div><div class="kit-note">第 1–3 个半衰期。不用最早。</div></div>
+      <div class="kit-cell"><div class="sw" style="background:var(--c-hoot);color:var(--bg)">--c-hoot</div><div class="kit-note">第 3–8 个半衰期。算完了才买。</div></div>
+      <div class="kit-cell"><div class="sw" style="background:var(--c-lazlo);color:var(--on-free)">--c-lazlo</div><div class="kit-note">归零免费。反正最后都是大家的。</div></div>
     </div>
   </section>
 
-  <!-- ══════ 3 价格块（活的） ══════ -->
   <section class="kit-sec">
-    <div class="kit-h">03 / 价格块（签名动作：越低越冷，归零转青绿）</div>
-    <div style="border:1px solid var(--hair);padding:40px 40px 32px">
-      <div class="eyebrow"><span>SIGNAL #001</span><span class="dim">·</span><span>MONAD TESTNET</span><span class="right" id="blk">BLOCK 4,281,309</span></div>
+    <div class="kit-h">03 / 像素字体 · 三档网格，不要混用一条 fallback</div>
+    <div class="scale">
+      <div><span class="kit-note">12px · --num-lg · 大屏主价格</span><span style="font-family:var(--num-lg);font-size:48px;color:var(--price-hot)">$ 8.23</span></div>
+      <div><span class="kit-note">10px · --num-md · KPI / 成交流</span><span style="font-family:var(--num-md);font-size:28px">41 人知道</span></div>
+      <div><span class="kit-note">8px · --num-sm · 购买页 / 表单 / 法务</span><span style="font-family:var(--num-sm);font-size:16px;color:var(--fg-2)">BOUGHT · $ 7.71 · 41S</span></div>
+      <div><span class="kit-note">--ui · 系统黑体正文</span><span style="font-family:var(--ui);font-size:var(--t-body);color:var(--fg-2)">长句不用像素字体。像素字只留给数字和短句。</span></div>
+    </div>
+  </section>
+
+  <section class="kit-sec">
+    <div class="kit-h">04 / 五个角色 · 标准尺寸</div>
+    <div class="cast" id="cast">
+      <figure><canvas id="sp-halfie" width="64" height="64" style="image-rendering:pixelated"></canvas><figcaption>Halfie<br><span class="dim">火种本体</span></figcaption></figure>
+      <figure><canvas id="sp-bolt" width="64" height="64" style="image-rendering:pixelated"></canvas><figcaption>Bolt<br><span class="dim">我比你们早。</span></figcaption></figure>
+      <figure><canvas id="sp-rush" width="64" height="64" style="image-rendering:pixelated"></canvas><figcaption>Rush<br><span class="dim">不用最早。</span></figcaption></figure>
+      <figure><canvas id="sp-hoot" width="64" height="64" style="image-rendering:pixelated"></canvas><figcaption>Hoot<br><span class="dim">算完了才买。</span></figcaption></figure>
+      <figure><canvas id="sp-lazlo" width="64" height="64" style="image-rendering:pixelated"></canvas><figcaption>Lazlo<br><span class="dim">最后都是大家的。</span></figcaption></figure>
+    </div>
+    <table class="sizes">
+      <thead><tr><th>挂载点</th><th>角色</th><th>边长</th></tr></thead>
+      <tbody>
+        <tr><td>首页列表</td><td>Halfie</td><td>20</td></tr>
+        <tr><td>购买页阵营提示</td><td>Bolt / Rush / Hoot / Lazlo</td><td>20</td></tr>
+        <tr><td>收据徽章</td><td>成交时的阵营</td><td>24</td></tr>
+        <tr><td>大屏阵营计数</td><td>四个阵营</td><td>28</td></tr>
+        <tr><td>购买页主体</td><td>Halfie</td><td>120</td></tr>
+        <tr><td>大屏</td><td>Halfie</td><td>220</td></tr>
+      </tbody>
+    </table>
+    <p class="kit-note">画进 canvas 时必须 <code>imageSmoothingEnabled = false</code>。CSS 的 pixelated 只管元素缩放，不管 drawImage 的采样。</p>
+  </section>
+
+  <section class="kit-sec">
+    <div class="kit-h">05 / 价格块</div>
+    <div style="border:2px solid var(--line-strong);padding:40px 40px 32px">
+      <div class="eyebrow"><span>SIGNAL #001</span><span class="dim">·</span><span>火在冷却</span><span class="right" id="blk">BLOCK 4,281,309</span></div>
       <div class="price big" id="p">
         <span class="unit">$</span><span id="pnum">10.00</span>
       </div>
-      <div class="dim" id="psub" style="margin-top:12px;font-variant-numeric:tabular-nums">每 3.8 秒便宜一点 · 还剩 16 分 04 秒</div>
-      <div class="kit-note">规则：数字位用 tabular-nums；只有变化的位加 <code>.chg</code>（-3px，120ms）；颜色过渡 280ms，必须短于 400ms 的跳动间隔</div>
+      <div class="dim" id="psub" style="margin-top:12px;font-variant-numeric:tabular-nums">每 400 毫秒少一颗火星</div>
+      <div class="kit-note">变化的那一位只切颜色和透明度，不做位移。颜色过渡 280ms，必须短于 400ms 的跳动。</div>
     </div>
   </section>
 
-  <!-- ══════ 4 KPI + 曲线 + 流水 ══════ -->
   <section class="kit-sec">
-    <div class="kit-h">04 / KPI · 曲线 · 成交流（大屏右栏）</div>
+    <div class="kit-h">06 / 阶梯曲线 · 成交是方块</div>
     <div class="screen-box" style="padding:40px">
-      <div class="row" style="margin:0 0 24px">
-        <div><div class="k">已有</div><div class="v">41</div><div class="k">人知道</div></div>
-        <div><div class="k">还剩</div><div class="v">14:22</div></div>
-        <div><div class="k">差价</div><div class="v">2.4×</div></div>
-      </div>
-      <svg id="chart" viewBox="0 0 900 220" preserveAspectRatio="none" aria-label="价格曲线"></svg>
-      <ol class="feed" id="feed">
-        <li>#41 买入 $ 4.03 · 312s</li>
-        <li>#40 买入 $ 4.31 · 296s</li>
-        <li>#39 买入 $ 4.62 · 281s</li>
-      </ol>
-      <div class="kit-note">曲线用 <code>.curve</code>；成交点 <code>.dot</code> 半径 3，不发光不描边；流水只保留最近 12 条</div>
+      <svg id="chart" viewBox="0 0 900 220" preserveAspectRatio="none" aria-label="价格阶梯"></svg>
+      <div class="kit-note">priceAt() 是 32 档台阶。这里画阶梯，不画平滑线，不铺渐变。</div>
     </div>
   </section>
 
-  <!-- ══════ 5 按钮 ══════ -->
   <section class="kit-sec">
-    <div class="kit-h">05 / 按钮（全局零圆角，唯一例外是移动端主 CTA）</div>
+    <div class="kit-h">07 / 按钮 · 全局直角，按下时吃掉硬阴影</div>
     <div class="kit-grid">
-      <div class="kit-cell"><button>次级操作</button><div class="kit-note">透明底 + 发丝线框</div></div>
-      <div class="kit-cell"><button class="go">现在免费 · 领取</button><div class="kit-note">.go = 归零态</div></div>
-      <div class="kit-cell"><button disabled>锁价中…</button><div class="kit-note">禁用 opacity .45</div></div>
-      <div class="kit-cell">
-        <button style="width:100%;height:56px;background:var(--accent);color:var(--on-accent);border:0;border-radius:var(--r-cta);font-size:17px;font-weight:600">现在买 · $8.23</button>
-        <div class="kit-note">移动端主 CTA（唯一圆角 10px）</div>
-      </div>
+      <div class="kit-cell"><button type="button">次级操作</button><div class="kit-note">实心底 + 2px 硬边 + 3px 硬阴影</div></div>
+      <div class="kit-cell"><button type="button" class="go">现在免费 · 领取</button><div class="kit-note">.go = 归零态</div></div>
+      <div class="kit-cell"><button type="button" disabled>锁价中…</button><div class="kit-note">禁用 opacity .45，阴影还在</div></div>
+      <div class="kit-cell"><button type="button" class="buy">现在买 · $8.23</button><div class="kit-note">主 CTA 用 --accent，圆角仍是 0</div></div>
     </div>
   </section>
 
-  <!-- ══════ 6 表单 ══════ -->
   <section class="kit-sec">
-    <div class="kit-h">06 / 表单（发布台）</div>
-    <div style="max-width:520px">
-      <label>标题（≤60 字）<input value="某地址 12 分钟前把 4.2M USDC 转进了一个新部署的合约" /></label>
-      <label>正文<textarea rows="3">这不是一条快讯，是一个可以被提前知道的时间差。</textarea></label>
+    <div class="kit-h">08 / 发布台表单</div>
+    <div style="max-width:560px">
+      <label>标题（≤60 字）<input value="火种离开奥林匹斯的第一句话" /></label>
       <fieldset>
-        <legend>参数预设</legend>
-        <label><input type="radio" name="k" checked /> 突发 · $10 → 30s 半衰期</label>
-        <label><input type="radio" name="k" /> 常规 · $10 → 120s 半衰期</label>
+        <legend>冷却速度</legend>
+        <label><input type="radio" name="k" checked /> 迅猛燃烧 · 30 秒半衰期</label>
+        <label><input type="radio" name="k" /> 匀速冷却 · 120 秒半衰期</label>
+        <label><input type="radio" name="k" /> 深埋余烬 · 3600 秒半衰期</label>
       </fieldset>
-      <button style="width:100%">发布</button>
-      <div class="kit-note">输入框只有下边线，聚焦时变 accent；不要加 rounded 卡片、不要加 placeholder 灰块</div>
+      <button type="button">带下山</button>
     </div>
   </section>
 
-  <!-- ══════ 7 收据 ══════ -->
   <section class="kit-sec">
-    <div class="kit-h">07 / 收据（购买后唯一一屏）</div>
-    <div class="mobile">
-      <div class="mobile-box" id="receipt" style="padding:40px 28px">
-        <div class="k">ALPHA CLOCK · RECEIPT</div>
-        <h2 style="margin-top:10px">你是第 <b style="font-family:var(--num);font-weight:300">41</b> 个知道的</h2>
-        <dl>
-          <dt>你付了</dt><dd>$4.03</dd>
-          <dt>第一个人付了</dt><dd>$9.12</dd>
-          <dt>你比 ta 少付</dt><dd>2.3 倍</dd>
-          <dt>你晚了</dt><dd>5 分 12 秒</dd>
-        </dl>
-        <pre>你晚 312 秒，省 5.09 美元。
-这条信息在链上只被读了一次——
-读它的人，是你。</pre>
-        <div class="disclaimer" style="margin-top:0;border:0;padding-top:16px">这句话，一个字都没变</div>
-      </div>
-    </div>
-  </section>
-
-  <!-- ══════ 8 禁止清单 ══════ -->
-  <section class="kit-sec">
-    <div class="kit-h">08 / 禁止清单（Opus 最容易自己加上去的）</div>
-    <div class="kit-grid" style="grid-template-columns:repeat(auto-fit,minmax(280px,1fr))">
-      <div class="kit-cell"><div class="k" style="color:var(--alert)">不要</div><p class="dim" style="font-size:13px;line-height:1.9">圆角卡片 + 柔和阴影<br>紫色/蓝色渐变<br>Inter / Roboto / Arial<br>emoji 当图标<br>居中大标题 + 副标题 + 双按钮的落地页结构<br>加载时的骨架屏闪光</p></div>
-      <div class="kit-cell"><div class="k" style="color:var(--free)">要</div><p class="dim" style="font-size:13px;line-height:1.9">1px 发丝线做分隔<br>等宽数字 + tabular-nums<br>左对齐 + 大留白<br>只在"变化"时动<br>颜色承载信息（温度）<br>所有数字都能追溯到链上</p></div>
+    <div class="kit-h">09 / 不要</div>
+    <div class="kit-grid">
+      <div class="kit-cell"><div class="k" style="color:var(--alert)">不要</div><p class="dim">圆角、渐变、发丝线、emoji 当图标、平滑价格曲线、改那六个冻结色、用位移抖像素字体。</p></div>
+      <div class="kit-cell"><div class="k" style="color:var(--free)">要</div><p class="dim">2px 硬边框、Fusion Pixel 等宽数字、阶梯折线、阵营按买入时机计算、归零才转青绿。</p></div>
     </div>
   </section>
 
 </div>
 
-<script>
-// ── 价格演示：10.00 → 0.00 循环，逐位高亮 ──
+<script type="module">
+import { loadSprite } from "./js/sprites.js";
+
 const start = performance.now();
 const DUR = 24000, BASE = 10;
 let prev = "";
@@ -196,61 +182,66 @@ function tick() {
   const el = (performance.now() - start) % (DUR + 3000);
   const t = Math.min(el / DUR, 1);
   const p = BASE * Math.pow(2, -t * 8);
-
   const str = p >= 0.005 ? p.toFixed(2) : "0.00";
   const box = document.getElementById("pnum");
   const isFree = p < 0.005;
-  const cls = isFree ? "zero" : "";
   let html = "";
   for (let i = 0; i < str.length; i++) {
     const ch = str[i];
     const changed = prev[i] !== undefined && prev[i] !== ch && ch !== ".";
-    html += `<span class="d ${changed ? "chg" : ""} ${cls}">${ch}</span>`;
+    html += `<span class="d ${changed ? "chg" : ""} ${isFree ? "zero" : ""}">${ch}</span>`;
   }
   prev = str;
   box.innerHTML = html;
-
   const pEl = document.getElementById("p");
   pEl.style.color = isFree ? "var(--free)" : tempColor(p / BASE);
   pEl.classList.toggle("free", isFree);
-
   const left = Math.max(0, Math.round((1 - t) * 964));
   document.getElementById("psub").textContent = isFree
     ? "已永久公开 · 谁都可以读"
-    : `每 3.8 秒便宜一点 · 还剩 ${String(Math.floor(left / 60)).padStart(2, "0")} 分 ${String(left % 60).padStart(2, "0")} 秒`;
-
-  const blk = document.getElementById("blk");
-  blk.textContent = "BLOCK " + (4281309 + Math.floor(t * 964 / .4)).toLocaleString();
+    : `每 400 毫秒少一颗火星 · 还剩 ${String(Math.floor(left / 60)).padStart(2, "0")} 分 ${String(left % 60).padStart(2, "0")} 秒`;
+  document.getElementById("blk").textContent = "BLOCK " + (4281309 + Math.floor(t * 964 / .4)).toLocaleString();
   requestAnimationFrame(tick);
 }
 tick();
 
-// ── 曲线：用真实公式画，不用假数据 ──
-(function drawCurve(){
+(function drawCurve() {
   const svg = document.getElementById("chart");
-  const W = 900, H = 220, N = 120;
+  const W = 900, H = 220, N = 32;
   const pts = [];
   for (let i = 0; i <= N; i++) {
     const t = i / N;
     const p = BASE * Math.pow(2, -t * 8);
     pts.push([t * W, H - (p / BASE) * (H - 8)]);
   }
-  const d = pts.map((p, i) => (i ? "L" : "M") + p[0].toFixed(1) + "," + p[1].toFixed(1)).join(" ");
-  const area = d + ` L${W},${H} L0,${H} Z`;
-  const dots = [[0.12,7.9],[0.28,6.4],[0.46,4.7],[0.68,3.1],[0.86,1.9]]
-    .map(([t,p]) => { const x = t*W, y = H - (p/BASE)*(H-8); return `<circle class="dot" cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="3"/>`; }).join("");
-  svg.innerHTML = `
-    <defs>
-      <linearGradient id="ag" x1="0" y1="0" x2="0" y2="1">
-        <stop offset="0%" stop-color="#FFC53D" stop-opacity=".10"/>
-        <stop offset="100%" stop-color="#FFC53D" stop-opacity="0"/>
-      </linearGradient>
-    </defs>
-    <path d="${area}" fill="url(#ag)"/>
-    <path d="${d}" class="curve"/>
-    <line x1="${W*0.46}" x2="${W*0.46}" y1="0" y2="${H}" class="now"/>
-    ${dots}`;
+  let d = `M${pts[0][0].toFixed(1)},${pts[0][1].toFixed(1)}`;
+  for (let i = 1; i < pts.length; i++) {
+    const [px, py] = pts[i - 1];
+    const [x, y] = pts[i];
+    d += ` L${x.toFixed(1)},${py.toFixed(1)} L${x.toFixed(1)},${y.toFixed(1)}`;
+  }
+  const dots = [[0.12, 7.9], [0.28, 6.4], [0.46, 4.7], [0.68, 3.1], [0.86, 1.9]]
+    .map(([t, p]) => {
+      const x = t * W, y = H - (p / BASE) * (H - 8);
+      return `<rect class="dot" x="${(x - 4).toFixed(1)}" y="${(y - 4).toFixed(1)}" width="8" height="8"/>`;
+    }).join("");
+  svg.innerHTML = `<path d="${d}" class="curve" fill="none"/>${dots}`;
 })();
+
+const cast = [
+  ["sp-halfie", "halfie"],
+  ["sp-bolt", "bolt"],
+  ["sp-rush", "rush"],
+  ["sp-hoot", "hoot"],
+  ["sp-lazlo", "lazlo"],
+];
+for (const [id, name] of cast) {
+  const img = await loadSprite(name);
+  const canvas = document.getElementById(id);
+  const ctx = canvas.getContext("2d");
+  ctx.imageSmoothingEnabled = false;
+  ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+}
 </script>
 </body>
 </html>
