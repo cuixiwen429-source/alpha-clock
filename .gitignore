@@ -13,3 +13,7 @@ backend/contracts/broadcast/*/31337/
 *.log
 events.ndjson
 backend/.runtime/
+
+# 每次部署 / seed 都会重写的状态文件：不进 git，避免把本机 anvil 地址带给别人
+backend/contracts/deployments.json
+backend/content.json
