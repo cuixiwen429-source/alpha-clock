@@ -13,7 +13,6 @@
     "seed": "tsx src/scripts/seed.ts",
     "buy": "tsx src/scripts/buy.ts",
     "serve": "tsx src/server/alpha-api.ts",
-    "facilitator:local": "tsx src/server/local-facilitator.ts",
     "demo": "bash scripts/demo-local.sh",
     "typecheck": "tsc --noEmit",
     "test": "tsx --test src/**/*.test.ts",

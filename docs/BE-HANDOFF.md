@@ -31,6 +31,14 @@ npm run deploy:local && npm run seed && npm run serve   # 终端 B
 http://localhost:<你的静态服务>/s.html?id=1&api=http://127.0.0.1:4030
 ```
 
+**注意端口冲突**：mock 和真后端默认都是 4030，不能同时开。开发期建议 mock 用 `PORT=4031 npm run mock`，或者联调时只开真后端。真后端被 mock 顶掉时 `npm run serve` 会直接报 `端口 4030 已被占用`。
+
+一条命令从零跑完整链路（清链、部署、seed、起服务、造几笔成交、打战报）：
+
+```bash
+cd backend && npm run demo          # 或 bash scripts/demo-local.sh 5 12
+```
+
 `/api/config` 返回 `mock: false` 时，页面就该走「浏览器钱包 → approve → `AlphaClock.buy()`」而不是 `/__mock/buy`。这条分支目前**只有 mock 侧被跑过**，真后端侧的钱包路径请你重点验。
 
 ## 3. 五个坑（都是真踩过的）
