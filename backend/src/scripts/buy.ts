@@ -38,13 +38,13 @@ async function main() {
 
   const who = account.address as Address;
 
-  const already = await pub.readContract({
+  const existingAccess = await pub.readContract({
     address: dep.alphaClock,
     abi: ALPHA_ABI,
-    functionName: "hasAccess",
+    functionName: "accessOf",
     args: [BigInt(signalId), who],
   });
-  if (already) {
+  if (existingAccess.at > 0n) {
     console.log(`  你已经买过 #${signalId} 了`);
     return;
   }
@@ -61,27 +61,36 @@ async function main() {
     return;
   }
 
-  const bal = await pub.readContract({
+  let bal = await pub.readContract({
     address: dep.usdc,
     abi: ERC20_ABI,
     functionName: "balanceOf",
     args: [who],
   });
+  // 本地 MockUSDC 只给部署者初始余额，买家账户默认是 0 —— 现场演示
+  // 「开 5 个终端各买一次」时不能让人先去手动 faucet
+  if (bal < price && dep.isMockUSDC) {
+    const faucetHash = await wallet.writeContract({
+      address: dep.usdc,
+      abi: ERC20_ABI,
+      functionName: "faucet",
+      args: [who, usdc(10_000)],
+    });
+    await pub.waitForTransactionReceipt({ hash: faucetHash });
+    bal = await pub.readContract({
+      address: dep.usdc,
+      abi: ERC20_ABI,
+      functionName: "balanceOf",
+      args: [who],
+    });
+    console.log(`  已从 MockUSDC 水龙头领 ${money(bal)}`);
+  }
   if (bal < price) {
     console.error(`  USDC 不够：有 ${money(bal)}，要 ${money(price)}`);
     process.exit(1);
   }
 
   console.log(`  ${who.slice(0, 10)}… 要买 #${signalId}，此刻价格 ${money(price)}`);
-
-  // approve（只做一次，够用就行）
-  const allowance = await pub.readContract({
-    address: dep.usdc,
-    abi: ERC20_ABI,
-    functionName: "balanceOf",
-    args: [who],
-  });
-  void allowance;
 
   const approveHash = await wallet.writeContract({
     address: dep.usdc,
@@ -101,20 +110,14 @@ async function main() {
   const rc = await pub.waitForTransactionReceipt({ hash });
   const ms = Date.now() - t0;
 
-  const paid = await pub.readContract({
+  const access = await pub.readContract({
     address: dep.alphaClock,
     abi: ALPHA_ABI,
-    functionName: "paidPrice",
+    functionName: "accessOf",
     args: [BigInt(signalId), who],
   });
-  const buyCount = await pub.readContract({
-    address: dep.alphaClock,
-    abi: ALPHA_ABI,
-    functionName: "accessCount",
-    args: [BigInt(signalId)],
-  });
 
-  console.log(`  ✔ 成交  ${money(paid)}  第 ${buyCount} 个买家  确认 ${ms}ms  tx=${hash.slice(0, 12)}`);
+  console.log(`  ✔ 成交  ${money(access.price)}  确认 ${ms}ms  tx=${hash.slice(0, 12)}`);
   console.log(`     链上确认区块 ${rc.blockNumber} —— 这一笔就是"你比别人早看到了多久"的价格`);
   await sleep(10);
 }

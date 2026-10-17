@@ -23,3 +23,21 @@ jobs:
       - uses: foundry-rs/foundry-toolchain@v1
       - run: forge test -vv
         working-directory: backend/contracts
+
+  backend:
+    name: 后端类型 + 单测 + API 契约
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+      - run: npm ci
+        working-directory: backend
+      # typecheck + domain 单测 + shared/check-contract 对 fixture 后端跑一遍
+      - run: npm run check
+        working-directory: backend
+      - name: 前端 UI 漂移检查
+        run: node shared/check-ui.mjs

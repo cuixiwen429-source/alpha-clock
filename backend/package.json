@@ -6,16 +6,19 @@
   "description": "AlphaClock — 一条信息的价格，每秒都在掉。",
   "scripts": {
     "anvil": "anvil --block-time 1 --host 127.0.0.1 --port 8545",
-    "deploy:local": "cd contracts && PATH=\"$HOME/.foundry/bin:$PATH\" forge script script/Deploy.s.sol:Deploy --rpc-url http://127.0.0.1:8545 --broadcast",
-    "deploy:testnet": "cd contracts && PATH=\"$HOME/.foundry/bin:$PATH\" forge script script/Deploy.s.sol:Deploy --rpc-url https://testnet-rpc.monad.xyz --broadcast",
-    "forge:build": "cd contracts && PATH=\"$HOME/.foundry/bin:$PATH\" forge build",
-    "forge:test": "cd contracts && PATH=\"$HOME/.foundry/bin:$PATH\" forge test -vv",
+    "deploy:local": "node scripts/reset-state.mjs && node scripts/foundry.mjs script script/Deploy.s.sol:Deploy --rpc-url http://127.0.0.1:8545 --broadcast",
+    "deploy:testnet": "node scripts/reset-state.mjs && node scripts/foundry.mjs script script/Deploy.s.sol:Deploy --rpc-url https://testnet-rpc.monad.xyz --broadcast",
+    "reset:state": "node scripts/reset-state.mjs",
+    "forge:build": "node scripts/foundry.mjs build",
+    "forge:test": "node scripts/foundry.mjs test -vv",
     "seed": "tsx src/scripts/seed.ts",
     "buy": "tsx src/scripts/buy.ts",
     "serve": "tsx src/server/alpha-api.ts",
-    "facilitator:local": "tsx src/server/local-facilitator.ts",
     "demo": "bash scripts/demo-local.sh",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test": "tsx --test src/**/*.test.ts",
+    "test:contract": "tsx src/testing/contract-check.ts",
+    "check": "npm run typecheck && npm test && npm run test:contract"
   },
   "dependencies": {
     "@x402/axios": "^2.28.0",
@@ -37,6 +40,6 @@
     "typescript": "^5.9.0"
   },
   "engines": {
-    "node": ">=20"
+    "node": ">=22"
   }
 }

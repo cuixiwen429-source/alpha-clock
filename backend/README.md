@@ -1,260 +1,150 @@
-# AlphaClock
+# AlphaClock Backend
 
-> **一条信息的价格，从 $10 开始，每 2 分钟减半。**
-> **谁先付钱，谁先看到。**
-> **8 个半衰期之后，它永久免费。**
+AlphaClock 的独立后端：Express API、x402 报价与结算、Monad 事件索引、内容交付和收据签发。前端只依赖仓库根目录的 `shared/API.md`，后端不托管前端资源。
 
----
+## 环境
 
-## 这是什么
-
-一个**按时间定价的信息市场**。
-
-传统付费内容的定价是固定的：一篇研报 ¥199，一条快讯 $5，一个月会员 $30。
-但信息不是这样值钱的。信息的价值随**你比别人早多少**而变——
-
-PolyHub 复盘了 Polymarket 上 2,023 笔链上成交，结论是：
-
-> **Alpha 的半衰期 < 2 分钟。前 10 分钟吸收了 96% 的信息优势。**
-> 花 1 分钟去确认消息真假，你就把绝大部分利润让给了敢盲冲的人。
-
-他们把这笔成本叫「**确认税**」。
-
-AlphaClock 做的就是把这笔税**显式标价**：
-
-```
-price(t) = basePrice × 2^( -(t - publishedAt) / halfLife )
-```
-
-- 发布于 T0，价格 $10
-- 2 分钟后 $5
-- 4 分钟后 $2.5
-- ……
-- 16 分钟后 $0，永久公开
-
-**你付的钱，对应的是「你比市场早看到了多久」，而不是「卖家今天心情如何」。**
-
----
-
-## 为什么这是产品，不是 Demo
-
-| | 传统付费内容 | AlphaClock |
-|---|---|---|
-| 定价 | 卖家定，固定 | 时间定，连续下滑 |
-| 谁付得多 | 所有人一样 | 最早知道的人付最多，也赚最多 |
-| 滞销怎么办 | 打折促销（人工） | 自动衰减到免费（无人干预） |
-| 价格可信吗 | 信平台 | **链上可复核，卖家改不了** |
-| 谁会买 | 人 | **人 + AI Agent**（Agent 需要信息做决策） |
-
-**关键设计**：价格是**纯时间函数**。它不随购买次数变，不随出价变，没有任何人能调高或调低。
-合约 owner 不能改，发布者不能改，平台也不能改。唯一能改变价格的是区块时间戳本身。
-
-这是这个产品的全部信任基础。
-
----
-
-## 为什么必须是 Monad
-
-这是核心论证，分三层，每层都能被独立验证。
-
-### 第一层：一条热门信息，会在几分钟内被几百人买走
-
-信息的时间窗口只有 2 分钟（Alpha 半衰期）。这 2 分钟里，一条值得买的信息会有几十到几百个买家，
-每人付一个不同的价格，**每笔都是真实结算**。
-
-| | 以太坊 | Monad |
-|---|---|---|
-| 出块间隔 | 12 秒 | 0.4 秒 |
-| 2 分钟窗口里有几个块 | **10 个** | **300 个** |
-| 一笔 USDC 转账 gas | ~$0.5 | ~$0.0001 |
-| 100 笔购买的总 gas | **$50** | **$0.01** |
-| 100 笔购买要多久 | **20 分钟**（信息早过期了） | **40 秒** |
-
-**在以太坊上，你还没买完，信息就已经不值钱了。**
-
-### 第二层：这 100 笔不能合并
-
-有人会说「你用 batch settlement 不就行了」。不行，因为：
-
-- 每个买家付的价格**不一样**（价格每秒在变）
-- 每个买家在不同的**时间点**成交，而这个时间点就是商品本身
-- 合并 = 抹掉时间差 = 抹掉这个产品
-
-**这是少数几个「合并即失去意义」的场景。**
-
-### 第三层：单笔支付的价值确实低于以太坊的 gas
-
-价格最低可以掉到 **$0.001**（6 位小数 USDC）。
-以太坊上一笔 transfer 的 gas 是 $0.3–1.0，**是商品价格的 300–1000 倍**。
-
-而 Monad 上 gas ≈ $0.0001，是商品价格的 1/10。
-
-> **在以太坊上，这个产品的价格曲线会在 $0.3 处硬生生折断 —— 因为再往下，手续费比信息本身还贵。**
-> **在 Monad 上，它一路掉到零。**
-
-**这不是「更快更便宜」，这是「一条之前根本不存在的价格区间」。**
-
----
-
-## 机制细节
-
-### 定价
-
-```solidity
-price(t) = max(floorPrice, basePrice >> floor(elapsed / halfLife))
-```
-
-精度实现上做了两件事：
-
-1. **1/32 个半衰期一档**，不是整个半衰期一档 —— 价格是**连续下滑的曲线**，
-   不是「卡住 119 秒然后突然减半」的阶梯。演示时这条曲线就是产品本身。
-2. **整数 + 32 项定点表**，零浮点、零外部依赖。一次位移 + 一次乘法。
-
-粒度：每 `halfLife/32` 秒价格变化一次。`halfLife = 120s` 时，每 3.75 秒掉一档，肉眼看着是在连续下滑。
-
-### 分账
-
-- 95% → 发布者（**直接转，合约不留存**）
-- 5% → 平台金库
-
-合约里的 USDC 余额**恒为 0**。这不是疏忽，是设计要求：钱从不经过合约。
-
-### 免费公开
-
-发布满 8 个半衰期后，`currentPrice` 自动返回 0，任何人可读全文。不需要任何人触发交易。
-
-发布者也可以提前 `openNow()`（比如消息已经上了新闻）。
-
----
-
-## 两条购买路径
-
-### 路径 A：x402（Agent 用）
-
-```
-GET /api/signal/1/body
-→ 402 Payment Required
-  PAYMENT-REQUIRED: { price: "$7.07", ... }   ← 价格是链上现读的
-→ 客户端签 EIP-3009，重试
-→ 服务器 verify + settle（Monad 官方 facilitator）
-→ 返回正文
-```
-
-给 AI Agent 用：Agent 自己判断「$7.07 买这条值不值」，值得就付，不值得就等。
-**它不需要人，也不需要 API key。**
-
-### 路径 B：直接上链（人用 / 断网兜底）
-
-```
-USDC.approve(AlphaClock, ...)
-AlphaClock.buy(1)          → 钱直接打给发布者
-POST /api/claim { id, buyer }
-→ 服务器只验证链上 hasAccess(id, buyer)，不信任客户端提供的任何金额
-→ 返回正文
-```
-
-这条路不依赖 facilitator，本地 anvil 也能跑，**现场断网也能演示**。
-
----
-
-## 快速开始
+- Node.js 22
+- npm 10+
+- 合约开发/本地链另需 Foundry
 
 ```bash
-# 一次性
-export PATH="$HOME/.foundry/bin:$PATH"
+cd backend
+nvm use                         # 若使用 nvm，读取 backend/.nvmrc
+npm install
+cp .env.example .env
 
-# 全链路 demo（本地，无需联网，约 90 秒）
-bash scripts/demo-local.sh 5
+npm run check                   # 类型 + 单测 + 契约（不需要链）
+npm run serve                   # 自动读取 .env
 ```
 
-跑完打开 **http://127.0.0.1:4030/web/** —— 这就是投屏页面。
+默认监听 `0.0.0.0:4030`（可用 `HOST` / `PORT` 覆盖）。本机访问 `http://127.0.0.1:4030`；前端可用 `?api=http://<内网IP>:4030` 让同事的手机直接联调。
 
-手动分步：
+`.env` 由 `src/env.ts` 在入口最前面加载，`npm run serve/seed/buy/deploy:*` 都不需要再手动 `source .env`；已有的环境变量优先，所以测试里 `PORT=4398` 仍然压过 `.env`。
+
+## 本地整链跑通（约 30 秒）
 
 ```bash
-npm run anvil                 # 终端 1：本地链，每 1 秒出块
-npm run deploy:local          # 终端 2：部署
-npm run seed                  #          发布 3 条信号
-npm run serve                 #          启动 API + 投屏
-npm run buy 1 1               # 终端 3：第 1 个买家
-npm run buy 1 2               #          第 2 个买家（价格已经掉了）
-npm run forge:test            #          合约测试（14 个）
+npm run anvil            # 终端 A：本地链，1 秒一个块
+npm run deploy:local     # 终端 B：部署 MockUSDC + AlphaClock，写 contracts/deployments.json
+npm run seed             # 发布 3 条演示信号，正文写进 content.json
+npm run serve            # 起 API
+npm run buy 1 1          # 用 anvil 第 1 个账户买 #1（余额不足会自动从 MockUSDC 领水）
 ```
 
-### 上 Monad 测试网
+`npm run deploy:local` 会通过 `scripts/foundry.mjs` 读 `.env` 并补 `~/.foundry/bin` 到 PATH，所以 Foundry 装在默认位置时不必手动改 PATH；`deployments.json` 里会写入 `deploymentBlock`，索引器重启后能补全历史。
+
+部署脚本会先跑 `scripts/reset-state.mjs` 清掉 `content.json` / `.runtime/`：重新部署后信号 id 从 1 重新开始，本地这几份状态全部对不上新链 —— `content.json` 是 id→正文，`.runtime/free-claims.ndjson` 记着谁领过免费，`.runtime/quotes.json` 里的 `payTo` 是旧发布者。带着它们跑，轻则把上一条链的领取算到新信号头上，重则拿旧报价把 x402 的钱打给旧地址。所以部署后必须重新 `npm run seed`。只想单独清一次可以用 `npm run reset:state`。
+
+`contracts/deployments.json` 和 `content.json` 都是运行产物，**不进 git**：它们分别随部署和发布被重写，提交上去只会把某人本机的 anvil 地址带给别人。新克隆的仓库里它们不存在是正常的，按上面的顺序跑一遍就有。前端不要在本地读 `deployments.json`，合约地址一律走 `/api/config` 下发。
+
+## 分层
+
+```text
+src/env.ts                     .env 加载（必须第一个 import）
+src/chain/alpha-gateway.ts     Monad RPC、v1 ABI、发布与 recordX402
+src/domain/content-store.ts    正文与 keccak256 校验、原子落盘
+src/domain/quote-store.ts      10 秒锁价、10 分钟落盘保留
+src/indexer/alpha-indexer.ts   Published/Bought/Claimed/Opened 增量索引
+src/server/create-app.ts       HTTP、CORS、x402、SSE、错误契约
+src/server/alpha-api.ts        进程入口与优雅退出
+scripts/foundry.mjs            forge 统一入口（读 .env、补 PATH、锁定 contracts/）
+contracts/src/AlphaClock.sol   合约（v1 契约 / PRD 附录 C）
+```
+
+## 合约
+
+`contracts/src/AlphaClock.sol` 是 `shared/API.md` v1 对应的那一版，与上一版的差别：
+
+- `publish(title, previewURI, contentHash, basePrice, floorPrice, halfLife)` —— 正文不进链，只承诺 `keccak256(body)`；
+- 访问权合并成一个 `Access{at, price}` 单槽（`accessOf`），替代原来的 `hasAccess` + `paidPrice` 两张 mapping；
+- 去掉链上 `buyCount` / `revenue` 计数器，聚合一律由索引器从事件重建；
+- 新增 `claimFree()` 与 `Claimed` 事件，免费抢领成为链上事实；
+- `Opened(id, by, at)` 带上 `by`，区分「发布者提前公开」与「时间到了自然免费」。
+
+`priceAt()` 与 `shared/curve.mjs` 的 `priceAt()` 必须逐位一致，`test_MatchesSharedCurveTable` 会在 CI 里盯住这一点。改任何一边都要同时改另一边。
+
+价格算法不在后端复制实现，直接导入 `../shared/curve.mjs`。所有带实时价格的响应使用链上最新块时间作为 `serverTime`；RPC 不可用时返回统一的 `502 UPSTREAM`，不使用可能偏离链上状态的本机时钟报价。默认每 20 次实时价格响应再调用合约 `priceAt()` 抽样比对一次，可通过 `PRICE_CHECK_EVERY` 调整。
+
+## 接口
+
+实现 `shared/API.md` v1.0.0：
+
+- `GET /health`
+- `GET /api/config`
+- `GET|POST /api/signals`
+- `GET /api/signals/:id`
+- `GET /api/signals/:id/curve`
+- `GET /api/signals/:id/trades`
+- `GET /api/signals/:id/quote`
+- `GET /api/signals/:id/content`
+- `POST /api/signals/:id/claim`
+- `GET /api/signals/:id/receipt`
+- `GET /api/live/:id`
+- `GET /api/live/:id/stream`
+- `GET /manifest`
+
+错误统一为：
+
+```json
+{ "error": { "code": "NOT_FOUND", "message": "信号不存在" } }
+```
+
+CORS 显式暴露 `PAYMENT-REQUIRED`、`PAYMENT-RESPONSE` 和 `X-Quote-Id`。
+
+## 报价和正文
+
+`GET /api/signals/:id/quote` 将当时价格锁定 10 秒，同一信号在窗口内复用同一报价。报价在 `.runtime/quotes.json` 保留 10 分钟，所以客户端签名稍慢时仍能按原报价完成 x402 结算；结算金额不重新读取实时价。
+
+`/content` 的放行条件：
+
+1. 买家在链上已有 `Access`；
+2. x402 verify + settle 成功；
+3. 买家已有免费领取记录。
+
+按已冻结的接口约定，成功后直接返回明文 `body`，不下发浏览器端密钥片段。服务端仍校验 `keccak256(body) == contentHash`。`content.json` 是 P0 本地存储，不应用于生产敏感内容。
+
+## 索引器
+
+索引器每秒增量读取 `Published`、`Bought`、`Claimed`、`Opened`，在内存中重建 `buyers`、`claims`、`revenue`、`maxPaid`、`minPaid`、`recent`，不依赖合约全局计数器。
+
+测试网必须提供准确起点，优先级：
+
+1. `.env` 的 `DEPLOYMENT_BLOCK`；
+2. `contracts/deployments.json` 的 `deploymentBlock`（`npm run deploy:*` 自动写入）；
+3. 本地 anvil 从 0 扫，其它网络从当前块开始并输出警告。
+
+未配置时，非本地网络只从当前块开始并输出警告，避免无边界扫描公共 RPC；此时重启后历史聚合不完整。
+
+RPC 查询失败不会推进游标，下一轮会从同一块重试，不会静默跳过事件。
+
+## x402
+
+测试网默认开启，使用 `FACILITATOR_URL`。本地 Anvil 默认关闭；即使关闭，未付款请求仍返回标准化 `402`、`PAYMENT-REQUIRED` 和 `X-Quote-Id`，便于前端与契约测试。
+
+x402 成功结算后，后端使用 `VERIFIER_PRIVATE_KEY`（未配置时回退 `PRIVATE_KEY`）调用 `recordX402`。密钥只放 `.env`。
+
+## 验证
 
 ```bash
-export PRIVATE_KEY=0x...
-export NETWORK=monad-testnet
-export VERIFIER_ADDRESS=0x...        # 服务器热钱包
-export TREASURY_ADDRESS=0x...
+# 类型 + 5 项领域单测 + 14 项 shared API 契约测试（fixture 后端，不需要链）
+npm run check
 
-npm run deploy:testnet
-npm run seed
-npm run serve
+# 合约
+npm run forge:test        # 25 项：定价 / 抽成 / 重复购买 / 免费领取 / x402 / 提前公开
+
+# 真链联调
+npm run anvil             # 终端 A
+npm run deploy:local && npm run seed && npm run serve   # 终端 B
+node ../shared/check-contract.mjs http://127.0.0.1:4030 # 仓库根目录
+npm run buy 1 1           # 再买一笔，观察 /api/signals/1/trades 与 SSE 的 trade 事件
 ```
 
-水龙头：`faucet.monad.xyz`（MON）+ `faucet.circle.com`（USDC）。
+`npm run test:contract` 使用后端自己的 fixture，只验证 HTTP 契约，不冒充链上端到端证明。真实的发布、购买、`recordX402`、索引重建需要按上面的真链流程验证；2026-10-17 已在本地 anvil 上跑通整条链路（购买 → 索引 → 正文交付 → 收据 → `openNow` → `claimFree` → 进程重启后重建）。
 
----
+## 已确认的跨团队约定
 
-## 目录
-
-```
-contracts/
-  src/AlphaClock.sol        核心：定价、购买、分账（约 300 行）
-  src/MockUSDC.sol          本地测试币（含 EIP-3009 两个重载）
-  test/AlphaClock.t.sol     14 个测试：衰减、地板价、分账、x402 记账、曲线单调性
-  script/Deploy.s.sol       部署 + 写 deployments.json
-src/
-  config.ts                 网络 / ABI / 格式化
-  server/alpha-api.ts       API：动态定价、x402、claim、成交流水
-  scripts/seed.ts           发布信号
-  scripts/buy.ts            模拟买家
-web/index.html              投屏页面（价格曲线 + 实时成交流水）
-scripts/demo-local.sh       一键全链路
-```
-
----
-
-## 现场 3 分钟脚本
-
-**0:00–0:30｜问题**
-> 「各位现在看到的价格是 $10。两分钟前它是 $20。
-> 这不是打折。**每一条信息的价值，本来就是这样掉的 —— 只是从来没有人把它标出来过。**」
-
-**0:30–1:30｜演示**
-（让买家一个个上，价格一路滑下去）
-> 「第一个人付了 $10，因为他是第一个知道的。
-> 第三个人付了 $5.42。同样的内容，晚了两分钟，便宜了 46%。
-> **这就是『确认税』的价格。**」
-
-**1:30–2:30｜为什么是 Monad**
-> 「这条信息在 2 分钟内会被几十个人买走，每个人付不同的价格。
-> 以太坊 12 秒一个块 —— **2 分钟只有 10 个块**，你还没买完，信息就不值钱了。
-> 而且这个价格会一直掉到 $0.001。**以太坊上 gas 是 $0.3，比信息本身贵 300 倍。**
-> 在以太坊上，这条曲线会在 $0.3 处折断。在 Monad 上，它掉到零。」
-
-**2:30–3:00｜收尾**
-> 「这是第一个把『信息的时间价值』变成可交易价格的地方。
-> 而且它不只是给人用的 —— Agent 可以直接调这个 API，自己决定值不值得买。」
-
----
-
-## 诚实的取舍
-
-| 问题 | 现状 |
-|---|---|
-| 正文存在服务器上，没有加密 | Demo 简化。生产应加密存 IPFS，付款后由服务器下发解密密钥（接口形态已对齐） |
-| `recordX402` 由 verifier 热钱包写入 | 生产应换成 ERC-8004 Validation Registry 或 zk 证明 |
-| 内容真伪没验证 | 这是「信息市场」的通用难题。可以接 ERC-8004 声誉层，或要求发布者质押 |
-| 价格是纯时间函数，需求不影响价格 | 有意为之。加入需求冲击会让「价格客观」这个核心承诺失效 |
-
----
-
-## 参考
-
-- PolyHub《预测市场里，晚一分钟的真实代价》—— Alpha 半衰期 < 2 分钟，前 10 分钟吸收 96% 优势
-- Kiyotaki & Wright (1989), *On Money as a Medium of Exchange* —— 信息/商品的价值收敛
-- [x402 协议](https://docs.x402.org) —— HTTP 402 原生支付
-- [Monad 文档](https://docs.monad.xyz) —— 400ms 出块、10,000 TPS、并行执行
+- `/content` 返回明文正文。
+- `/api/config` 为前端提供网络、RPC、合约与 USDC 地址。
+- 所有实时价格响应包含 `serverTime` 或等价的报价时间字段。
+- 修改 `shared/` 必须另开 `contract/xxx` 分支并由前后端共同评审；本分支不修改共享契约。

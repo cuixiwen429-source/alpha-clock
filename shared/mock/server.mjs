@@ -89,12 +89,16 @@ seed();
 
 // ── 视图 ────────────────────────────────────────────────
 function stats(s) {
+  // 只看付费成交。免费领取的 price 是 0，算进 min 会让 minPaid 变成 "0.000000"、
+  // spread 变成 null —— 大屏会显示「∞」，而真后端（backend/src/indexer/alpha-indexer.ts
+  // 的 stats()）是只统计付费成交的，真链上永远不会出现 0.000000。
+  // mock 必须和真后端同口径，否则前端是照着一个不会发生的状态在调样式。
   const paid = s.trades.filter((t) => t.channel !== "free").map((t) => t.priceMicro);
   const all = s.trades.map((t) => t.priceMicro);
-  const max = all.length ? all.reduce((a, b) => (b > a ? b : a)) : null;
-  const min = all.length ? all.reduce((a, b) => (b < a ? b : a)) : null;
+  const max = paid.length ? paid.reduce((a, b) => (b > a ? b : a)) : null;
+  const min = paid.length ? paid.reduce((a, b) => (b < a ? b : a)) : null;
   const revenue = paid.reduce((a, b) => a + b, 0n);
-  const spread = all.length >= 2 && min > 0n ? Number((max * 100n) / min) / 100 : null;
+  const spread = paid.length >= 2 && min > 0n ? Number((max * 100n) / min) / 100 : null;
   return { buyers: paid.length, claims: all.length - paid.length, revenue, max, min, spread };
 }
 

@@ -5,30 +5,30 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
 /**
- * AlphaClock — 信息的时间价格
+ * AlphaClock — 信息的时间价格（契约 v1 / PRD v2）
  *
  * 一条信息的售价不是固定的，它是时间的函数：
  *
  *      price(t) = basePrice >> floor((t - publishedAt) / halfLife)
  *
- * 每经过一个半衰期，价格减半。到 floorPrice 为止，再经过 OPEN_HALVINGS
- * 个半衰期后永久免费公开。
+ * 每经过一个半衰期，价格减半。阶梯切成 32 份，所以是连续下滑而不是跳变。
+ * 经过 OPEN_HALVINGS 个半衰期后永久免费。
  *
  * 设计取舍（重要）：
  *   价格是纯时间函数 —— 不随购买次数变化，不随出价变化，没有任何人可以
  *   调高或调低它。卖家不能改，平台不能改，合约 owner 也不能改。
  *   唯一能改变价格的是区块时间戳本身。
  *
- *   这是这个产品的核心承诺：你付的钱，对应的是"你比市场早看到了多久"，
- *   而不是"卖家今天心情如何"。
- *
- * 为什么必须高频：
- *   一条热门信息的 Alpha 半衰期在 2 分钟以内（PolyHub 对 Polymarket
- *   2023 笔链上成交的复盘）。这段时间里可能有几百个人以几百个不同的
- *   价格买走它。每笔都是一次真实结算。
- *   以太坊 12 秒一个块 —— 2 分钟只有 10 个块。
- *   Monad 400 毫秒一个块 —— 2 分钟有 300 个块。
- *   这不是"更快"，是"窗口里塞得下的事件数差 30 倍"。
+ * 与上一版的差别（PRD 附录 C）：
+ *   1. 去掉 buyCount / revenue 两个全局计数器 —— 聚合由索引器从事件重建，
+ *      链上只保留"这条信息是谁、什么时候、卖多少钱、正文哈希是什么"。
+ *   2. 访问权从 hasAccess + paidPrice 两张 mapping 合并成一个 Access 单槽
+ *      (uint64 at + uint128 price)，读写各一次 SLOAD/SSTORE。
+ *   3. 新增 claimFree() —— 价格归零后任何人可领，链上留 Claimed 事件，
+ *      大屏的"抢免费"才有可信来源。
+ *   4. publish() 的第三个参数从 contentURI 改成 contentHash (bytes32)，
+ *      正文不进链、只承诺哈希；正文由后端按访问权交付。
+ *   5. Opened 事件补 by 字段，区分"发布者提前公开"和"时间到了自然免费"。
  */
 contract AlphaClock {
     using SafeERC20 for IERC20;
@@ -40,7 +40,7 @@ contract AlphaClock {
     uint256 public constant STEPS_PER_HALF = 32;
     uint256 private constant WAD = 1e18;
 
-    /// @dev 平台抽成上限（基点），硬编码 5%
+    /// @dev 平台抽成（基点），硬编码 5%，owner 也改不了
     uint16 public constant PROTOCOL_FEE_BPS = 500;
     uint16 public constant BPS_DENOMINATOR = 10_000;
 
@@ -57,21 +57,21 @@ contract AlphaClock {
         uint128 basePrice; // micro-USDC (6 位小数)
         uint128 floorPrice;
         uint32 halfLife; // 秒
-        uint32 buyCount;
-        uint128 revenue;
-        bool forcedOpen;
+        bool forcedOpen; // 发布者提前公开
+        bytes32 contentHash; // keccak256(正文)，正文本身不上链
         string title;
-        string previewURI; // 免费摘要，任何人可读
-        string contentURI; // 加密全文，付款后由 API 返回密钥
+        string previewURI; // 免费摘要
+    }
+
+    /// @dev 「谁在什么时候、以什么价格拿到了访问权」，压在一个槽里
+    struct Access {
+        uint64 at; // 0 = 从未获得
+        uint128 price; // 实付价；免费领取为 0
     }
 
     uint256 public signalCount;
     mapping(uint256 => Signal) internal _signals;
-
-    /// @notice signalId => buyer => 是否已获得访问权
-    mapping(uint256 => mapping(address => bool)) public hasAccess;
-    /// @notice signalId => buyer => 当时实际支付的价格
-    mapping(uint256 => mapping(address => uint128)) public paidPrice;
+    mapping(uint256 => mapping(address => Access)) internal _access;
 
     event Published(
         uint256 indexed id,
@@ -79,17 +79,13 @@ contract AlphaClock {
         string title,
         uint128 basePrice,
         uint128 floorPrice,
-        uint32 halfLife
+        uint32 halfLife,
+        bytes32 contentHash,
+        uint64 at
     );
-    event Bought(
-        uint256 indexed id,
-        address indexed buyer,
-        uint128 price,
-        uint32 buyCount,
-        uint64 elapsed,
-        bool viaX402
-    );
-    event Opened(uint256 indexed id, uint64 at, uint32 buyCount, uint128 revenue);
+    event Bought(uint256 indexed id, address indexed buyer, uint128 price, uint64 elapsed, bool viaX402);
+    event Claimed(uint256 indexed id, address indexed buyer, uint64 elapsed);
+    event Opened(uint256 indexed id, address indexed by, uint64 at);
     event VerifierChanged(address indexed previous, address indexed next);
 
     error NotOwner();
@@ -97,7 +93,8 @@ contract AlphaClock {
     error Closed();
     error BadParams();
     error FreeAlready();
-    error PriceMoved();
+    error NotFreeYet();
+    error AlreadyOwn();
 
     modifier onlyOwner() {
         if (msg.sender != owner) revert NotOwner();
@@ -114,14 +111,17 @@ contract AlphaClock {
     // ---------------------------------------------------------------- 发布
 
     /**
-     * @param basePrice  发布瞬间的价格（micro-USDC）。$10 = 10_000_000
-     * @param floorPrice 价格下限。低于它就一直停在它上面，直到免费公开
-     * @param halfLife   半衰期（秒）。突发消息 30–120，深度研究 3600+
+     * @param previewURI  免费摘要，任何人可读
+     * @param contentHash keccak256(正文)。正文由后端在访问权校验后交付，
+     *                    哈希上链是为了让"你看到的正文"可被验证没被改过
+     * @param basePrice   发布瞬间的价格（micro-USDC）。$10 = 10_000_000
+     * @param floorPrice  价格下限。低于它就一直停在它上面，直到免费公开
+     * @param halfLife    半衰期（秒）。突发消息 30–120，深度研究 3600+
      */
     function publish(
         string calldata title,
         string calldata previewURI,
-        string calldata contentURI,
+        bytes32 contentHash,
         uint128 basePrice,
         uint128 floorPrice,
         uint32 halfLife
@@ -137,20 +137,19 @@ contract AlphaClock {
         s.basePrice = basePrice;
         s.floorPrice = floorPrice;
         s.halfLife = halfLife;
+        s.contentHash = contentHash;
         s.title = title;
         s.previewURI = previewURI;
-        s.contentURI = contentURI;
 
-        emit Published(id, msg.sender, title, basePrice, floorPrice, halfLife);
+        emit Published(id, msg.sender, title, basePrice, floorPrice, halfLife, contentHash, uint64(block.timestamp));
     }
 
     // ---------------------------------------------------------------- 定价
 
     /**
      * @notice 任意时刻的价格。纯函数，不读任何可写状态。
-     * @dev 衰减粒度是 1/32 个半衰期，而不是整个半衰期 —— 价格是连续下滑的曲线，
-     *      不是"卡住不动然后突然减半"的阶梯。演示时这条曲线就是产品本身。
-     *      实现方式：整数部分用位移（>>），小数部分查 32 项定点表，一次乘法。
+     * @dev 与 shared/curve.mjs 的 priceAt() 逐位一致：整数部分用位移，
+     *      小数部分查 32 项定点表，一次乘法。改这里必须同步改 mjs，反之亦然。
      */
     function priceAt(uint256 id, uint64 t) public view returns (uint128) {
         Signal storage s = _signals[id];
@@ -245,13 +244,29 @@ contract AlphaClock {
         uint64 nowTs = uint64(block.timestamp);
         paid = priceAt(id, nowTs);
         if (paid == 0) revert FreeAlready();
-        if (hasAccess[id][msg.sender]) revert PriceMoved();
+        if (_access[id][msg.sender].at != 0) revert AlreadyOwn();
 
         uint128 fee = uint128((uint256(paid) * PROTOCOL_FEE_BPS) / BPS_DENOMINATOR);
         usdc.safeTransferFrom(msg.sender, s.publisher, paid - fee);
         if (fee > 0) usdc.safeTransferFrom(msg.sender, treasury, fee);
 
         _record(id, msg.sender, paid, nowTs, false);
+    }
+
+    /**
+     * @notice 价格归零后免费领取访问权。领过再领会 revert，后端返回原记录。
+     * @dev 上链的意义是让"第 N 个抢到免费的人"变成链上事实，大屏的 stampede
+     *      才有不可伪造的来源。
+     */
+    function claimFree(uint256 id) external {
+        Signal storage s = _signals[id];
+        if (s.publisher == address(0)) revert BadParams();
+        uint64 nowTs = uint64(block.timestamp);
+        if (priceAt(id, nowTs) != 0) revert NotFreeYet();
+        if (_access[id][msg.sender].at != 0) revert AlreadyOwn();
+
+        _access[id][msg.sender] = Access({at: nowTs, price: 0});
+        emit Claimed(id, msg.sender, nowTs - s.publishedAt);
     }
 
     /**
@@ -265,24 +280,16 @@ contract AlphaClock {
         Signal storage s = _signals[id];
         if (s.publisher == address(0)) revert BadParams();
         if (s.forcedOpen) revert Closed();
-        if (hasAccess[id][buyer]) revert PriceMoved();
+        if (price == 0) revert BadParams();
+        if (_access[id][buyer].at != 0) revert AlreadyOwn();
+
         _record(id, buyer, price, uint64(block.timestamp), true);
     }
 
     function _record(uint256 id, address buyer, uint128 price, uint64 nowTs, bool viaX402) private {
         Signal storage s = _signals[id];
-        s.buyCount += 1;
-        s.revenue += price;
-        hasAccess[id][buyer] = true;
-        paidPrice[id][buyer] = price;
-
-        emit Bought(id, buyer, price, s.buyCount, nowTs - s.publishedAt, viaX402);
-
-        // 卖够 OPEN_HALVINGS 个半衰期后自动免费，不用任何人手动触发
-        if (nowTs - s.publishedAt >= uint64(s.halfLife) * OPEN_HALVINGS) {
-            s.forcedOpen = true;
-            emit Opened(id, nowTs, s.buyCount, s.revenue);
-        }
+        _access[id][buyer] = Access({at: nowTs, price: price});
+        emit Bought(id, buyer, price, nowTs - s.publishedAt, viaX402);
     }
 
     /// @notice 发布者可以提前把信息送给所有人（比如消息已经公开了）
@@ -291,22 +298,21 @@ contract AlphaClock {
         if (msg.sender != s.publisher) revert NotOwner();
         if (s.forcedOpen) revert Closed();
         s.forcedOpen = true;
-        emit Opened(id, uint64(block.timestamp), s.buyCount, s.revenue);
+        emit Opened(id, msg.sender, uint64(block.timestamp));
     }
 
     // ---------------------------------------------------------------- 视图
 
     struct SignalView {
         address publisher;
-        string title;
-        string previewURI;
-        string contentURI;
         uint64 publishedAt;
         uint128 basePrice;
         uint128 floorPrice;
         uint32 halfLife;
-        uint32 buyCount;
-        uint128 revenue;
+        bool forcedOpen;
+        bytes32 contentHash;
+        string title;
+        string previewURI;
         uint128 price;
         bool freeNow;
     }
@@ -314,24 +320,32 @@ contract AlphaClock {
     function getSignal(uint256 id) external view returns (SignalView memory v) {
         Signal storage s = _signals[id];
         v.publisher = s.publisher;
-        v.title = s.title;
-        v.previewURI = s.previewURI;
-        v.contentURI = s.contentURI;
         v.publishedAt = s.publishedAt;
         v.basePrice = s.basePrice;
         v.floorPrice = s.floorPrice;
         v.halfLife = s.halfLife;
-        v.buyCount = s.buyCount;
-        v.revenue = s.revenue;
+        v.forcedOpen = s.forcedOpen;
+        v.contentHash = s.contentHash;
+        v.title = s.title;
+        v.previewURI = s.previewURI;
         v.price = priceAt(id, uint64(block.timestamp));
         v.freeNow = v.price == 0;
     }
 
+    /// @notice 某地址在某条信息上的访问权。at = 0 表示从未获得。
+    function accessOf(uint256 id, address buyer) external view returns (Access memory) {
+        return _access[id][buyer];
+    }
+
     /**
      * @notice 画出完整价格曲线：从发布到免费，取 samples 个采样点。
-     * @dev 前端直接拿这个数组画图，不需要自己算衰减。
+     * @dev 方便链上自检与前端调试；正式大屏走 API 的 /curve（同一套算法）。
      */
-    function curve(uint256 id, uint32 samples) external view returns (uint128[] memory prices, uint64[] memory times) {
+    function curve(uint256 id, uint32 samples)
+        external
+        view
+        returns (uint128[] memory prices, uint64[] memory times)
+    {
         Signal storage s = _signals[id];
         uint64 deadline = s.publishedAt + uint64(s.halfLife) * OPEN_HALVINGS;
         prices = new uint128[](samples);
@@ -344,18 +358,16 @@ contract AlphaClock {
         }
     }
 
-    function accessCount(uint256 id) external view returns (uint32) {
-        return _signals[id].buyCount;
-    }
-
     // ---------------------------------------------------------------- 管理
 
     function setVerifier(address next) external onlyOwner {
+        if (next == address(0)) revert BadParams();
         emit VerifierChanged(verifier, next);
         verifier = next;
     }
 
     function transferOwnership(address next) external onlyOwner {
+        if (next == address(0)) revert BadParams();
         owner = next;
     }
 }

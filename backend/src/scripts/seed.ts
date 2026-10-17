@@ -10,7 +10,7 @@
  */
 import { writeFileSync } from "node:fs";
 import { resolve } from "node:path";
-import { createPublicClient, createWalletClient, defineChain, http, type Address } from "viem";
+import { createPublicClient, createWalletClient, defineChain, http, keccak256, toBytes } from "viem";
 import { privateKeyToAccount } from "viem/accounts";
 import { config as dotenv } from "dotenv";
 import { ALPHA_ABI, ROOT, getDeployments, getNetwork, usdc } from "../config.js";
@@ -95,14 +95,15 @@ async function main() {
 
   const out = [];
   for (const s of SEEDS) {
+    const contentHash = keccak256(toBytes(s.body));
     const hash = await wallet.writeContract({
       address: dep.alphaClock,
       abi: ALPHA_ABI,
       functionName: "publish",
       args: [
         s.title,
-        `alpha://preview/${s.title}`,
-        `alpha://body/${s.title}`,
+        s.preview,
+        contentHash,
         usdc(s.basePrice),
         usdc(s.floorPrice),
         s.halfLife,
@@ -115,7 +116,15 @@ async function main() {
       functionName: "signalCount",
     });
     const id = Number(count);
-    out.push({ id, title: s.title, preview: s.preview, body: s.body, source: "demo" });
+    out.push({
+      id,
+      title: s.title,
+      previewText: s.preview,
+      body: s.body,
+      contentHash,
+      source: "demo",
+      attestPublicSource: true,
+    });
     console.log(`  ✔ #${id}  ${s.title}  $${s.basePrice} 起 / 半衰期 ${s.halfLife}s  tx=${hash.slice(0, 10)}`);
   }
 

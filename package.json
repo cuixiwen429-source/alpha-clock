@@ -7,6 +7,7 @@
     "mock": "node shared/mock/server.mjs",
     "mock:fast": "MOCK_HALFLIFE=8 node shared/mock/server.mjs",
     "check": "node shared/check-contract.mjs",
+    "check:frontend": "node shared/check-frontend.mjs",
     "test": "node --test shared/*.test.mjs",
     "ci": "node --test shared/*.test.mjs && node shared/ci-mock-check.mjs"
   },
