@@ -41,7 +41,9 @@ document.getElementById("base").textContent = api.base;
 try {
   const cfg = await api.config();
   document.getElementById("mode").textContent = cfg.mock ? "（MOCK）" : `（${cfg.network}）`;
-  const [signals, img] = await Promise.all([api.signals(), loadSprite("halfie")]);
+  const [allSignals, img] = await Promise.all([api.signals(), loadSprite("halfie")]);
+  // 标题以 __ 开头的是联调时打桩用的内部信号（契约探活、压测），不上公开榜单。
+  const signals = allSignals.filter((s) => !String(s.title).startsWith("__"));
   const list = document.getElementById("list");
   list.innerHTML = signals.length
     ? signals.map((s) =>
