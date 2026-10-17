@@ -115,11 +115,11 @@
      --num 按场景用具名字体变量（见下），不走单一 fallback 链：
      大屏和购买页需要不同网格密度的不同字体文件，不能指望一条
      font-family 链自动切换粗细/密度。
-     --ui 中文正文仍用系统黑体——像素字体逐字符都是硬边块，大段
-     正文用它会牺牲可读性，只在"数字/短句/标题"场景用像素字体。 ── */
-  --num-lg: "Fusion Pixel 12px", ui-monospace, monospace; /* 大屏主价格 */
-  --num-md: "Fusion Pixel 10px", ui-monospace, monospace; /* KPI / 成交流 */
-  --num-sm: "Fusion Pixel 8px",  ui-monospace, monospace; /* 购买页 / 表单 / 法务 */
+     --ui 是正文、标签、说明、按钮、名单。像素字体只用于价格
+     数字本身：中文句子用 8px 网格会糊成色块，看不清。 ── */
+  --num-lg: "Fusion Pixel 12px", ui-monospace, monospace; /* 价格数字，12px 网格 */
+  --num-md: "Fusion Pixel 10px", ui-monospace, monospace; /* 备用档，页面不再拿它排正文 */
+  --num-sm: "Fusion Pixel 8px",  ui-monospace, monospace; /* 备用档，不用于任何句子 */
   --num:    var(--num-sm); /* 兼容旧引用的默认档位 */
   --ui:     -apple-system, "PingFang SC", "Noto Sans SC", system-ui, sans-serif;
 
@@ -132,7 +132,7 @@
   --t-lead:  20px;
   --t-title: 34px;
   --t-head:  44px;
-  --t-price: 148px;
+  --t-price: 144px; /* 12×12：像素网格落在整像素上，避免 148px 的亚像素发糊 */
 
   /* ── 字重：像素字体通常只有 400（无真正粗体变体，虚拟加粗会破坏
      像素网格对齐），中文 UI 文字沿用系统黑体的 500/600 ── */

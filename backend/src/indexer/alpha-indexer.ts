@@ -83,7 +83,10 @@ export class AlphaIndexer {
 
   private async syncRange(fromBlock: bigint, toBlock: bigint) {
     if (toBlock < fromBlock) return;
-    const chunkSize = 2_000n;
+    // 硬编码 2000 在 Monad 测试网官方 RPC 上会被直接拒绝（实测限制 100 区块/次：
+    // "eth_getLogs is limited to a 100 range"），改成按网络配置（见 config.ts
+    // NetConfig.logChunkSize），本地 anvil 无此限制仍用大 chunk 减少请求数。
+    const chunkSize = this.gateway.net.logChunkSize;
     for (let from = fromBlock; from <= toBlock; from += chunkSize) {
       const to = from + chunkSize - 1n > toBlock ? toBlock : from + chunkSize - 1n;
       const [published, bought, claimed, opened, legacyPublished, legacyBought, legacyOpened] = await Promise.all([

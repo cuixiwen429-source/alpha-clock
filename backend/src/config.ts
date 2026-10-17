@@ -21,6 +21,10 @@ export interface NetConfig {
   explorer: string;
   faucet?: string;
   facilitatorSupported: boolean;
+  /** 索引器 getLogs 单次查询的最大区块跨度。官方 RPC 常对此有硬限制
+   *（Monad 测试网官方节点实测 100 区块/次，超出直接 400 "eth_getLogs is
+   * limited to a 100 range"）；本地 anvil 没有这个限制，用大一些的值减少请求次数。 */
+  logChunkSize: bigint;
 }
 
 export const FACILITATOR_URL =
@@ -36,6 +40,7 @@ export const NETWORKS: Record<string, NetConfig> = {
     explorer: "https://testnet.monadvision.com",
     faucet: "https://faucet.monad.xyz",
     facilitatorSupported: true,
+    logChunkSize: BigInt(process.env.LOG_CHUNK_SIZE || 100),
   },
   "monad-mainnet": {
     key: "monad-mainnet",
@@ -45,6 +50,7 @@ export const NETWORKS: Record<string, NetConfig> = {
     usdc: "0x754704Bc059F8C67012fEd69BC8A327a5aafb603",
     explorer: "https://monadvision.com",
     facilitatorSupported: true,
+    logChunkSize: BigInt(process.env.LOG_CHUNK_SIZE || 100),
   },
   "local-anvil": {
     key: "local-anvil",
@@ -54,6 +60,7 @@ export const NETWORKS: Record<string, NetConfig> = {
     usdc: "0x0000000000000000000000000000000000000000",
     explorer: "",
     facilitatorSupported: false,
+    logChunkSize: BigInt(process.env.LOG_CHUNK_SIZE || 2000),
   },
 };
 

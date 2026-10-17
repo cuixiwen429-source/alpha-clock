@@ -45,8 +45,8 @@ a { color: var(--fg); text-decoration: none; border-bottom: 1px solid var(--line
 a:hover { border-bottom-color: var(--accent); }
 
 code {
-  font-family: var(--num-sm);
-  font-size: 1.05em;
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  font-size: 0.92em;
   color: var(--fg-2);
   background: var(--surface-2);
   padding: 2px 6px;
@@ -54,7 +54,7 @@ code {
 
 /* 三级文字工具类 */
 .dim { color: var(--fg-2); }
-.err { color: var(--alert); font-size: var(--t-cap); font-family: var(--num-sm); }
+.err { color: var(--alert); font-size: var(--t-body); font-family: var(--ui); }
 
 /* 焦点：键盘可见，鼠标不打扰 */
 :focus-visible {
@@ -82,11 +82,11 @@ h2 {
   display: flex;
   align-items: center;
   gap: 12px;
-  font-family: var(--num-sm);
-  font-size: var(--t-micro);
-  letter-spacing: .1em;
+  font-family: var(--ui);
+  font-size: var(--t-cap);
+  letter-spacing: .04em;
   text-transform: uppercase;
-  color: var(--fg-3);
+  color: var(--fg-2);
   padding-bottom: var(--s2);
   border-bottom: 2px solid var(--line);
 }
@@ -132,7 +132,7 @@ button.go:hover { background: var(--free); }
    等宽依赖字体几何本身（Fusion Pixel Monospaced），tabular-nums
    仍声明作无害兜底。 */
 .price {
-  font-family: var(--num-sm);
+  font-family: var(--num-lg);
   font-size: 48px;
   font-weight: 400;
   line-height: 1.1;
@@ -145,7 +145,8 @@ button.go:hover { background: var(--free); }
   transition: color var(--d-temp) linear;
 }
 .price.big { font-size: var(--t-price); font-family: var(--num-lg); }
-.price.free { color: var(--free); }
+.price.free { color: var(--free); font-family: var(--ui); font-weight: 600; }
+.price.free .unit { display: none; }
 
 /* 逐字符硬切换：像素字体最怕非整数倍的亚像素位移（会让硬边字形
    边缘出现模糊插值），所以不再用 transform 位移抖动，改成"变化的
@@ -160,8 +161,8 @@ button.go:hover { background: var(--free); }
 .price .d.zero { color: var(--fg-3); }
 
 .unit {
-  font-family: var(--num-sm);
-  font-size: var(--t-cap);
+  font-family: var(--num-lg);
+  font-size: 24px;
   color: var(--fg-3);
   letter-spacing: .05em;
   margin-left: 10px;
@@ -202,14 +203,13 @@ main {
 
 /* KPI：像素等宽数字 + 小号眉标式标签 */
 .k {
-  font-family: var(--num-sm);
-  font-size: var(--t-micro);
-  letter-spacing: .1em;
-  text-transform: uppercase;
-  color: var(--fg-3);
+  font-family: var(--ui);
+  font-size: var(--t-cap);
+  letter-spacing: 0;
+  color: var(--fg-2);
 }
 .v {
-  font-family: var(--num-md);
+  font-family: var(--ui);
   font-size: 28px;
   font-weight: 400;
   font-variant-numeric: tabular-nums;
@@ -230,7 +230,7 @@ hr, .rule { border: 0; height: 2px; background: var(--line); margin: var(--s3) 0
   transition: background var(--d-tick) linear;
 }
 #list li:hover { background: var(--surface); }
-#list li a { border-bottom: 0; color: var(--fg-2); font-family: var(--num-sm); font-size: var(--t-cap); }
+#list li a { border-bottom: 0; color: var(--fg-2); font-family: var(--ui); font-size: var(--t-body); }
 #list li a:hover { color: var(--accent); }
 /* 每条信号前的迷你 Halfie 缩略图标：一排"正在冷却的火星" */
 #list li .mini-halfie { width: 20px; height: 20px; flex: none; }
@@ -241,8 +241,8 @@ hr, .rule { border: 0; height: 2px; background: var(--line); margin: var(--s3) 0
   list-style: none;
   margin: var(--s3) 0 0;
   padding: 0;
-  font-family: var(--num-sm);
-  font-size: var(--t-cap);
+  font-family: var(--ui);
+  font-size: var(--t-body);
   font-variant-numeric: tabular-nums;
   color: var(--fg-2);
   max-height: 180px;
@@ -276,10 +276,9 @@ hr, .rule { border: 0; height: 2px; background: var(--line); margin: var(--s3) 0
   display: flex;
   align-items: center;
   gap: 14px;
-  font-family: var(--num-md);
-  font-size: var(--t-cap);
-  letter-spacing: .1em;
-  text-transform: uppercase;
+  font-family: var(--ui);
+  font-size: var(--t-body);
+  letter-spacing: .02em;
   color: var(--fg-2);
   padding-bottom: var(--s2);
   border-bottom: 2px solid var(--line);
@@ -311,7 +310,7 @@ hr, .rule { border: 0; height: 2px; background: var(--line); margin: var(--s3) 0
   align-self: flex-start; margin-top: 14px; }
 .screen .k { text-align: right; }
 .screen .row > div:first-child .k { text-align: left; }
-.screen .row .v { font-family: var(--num-lg); font-size: var(--t-head); font-weight: 400; }
+.screen .row .v { font-family: var(--ui); font-size: var(--t-head); font-weight: 500; font-variant-numeric: tabular-nums; }
 .screen .k { margin-bottom: 2px; }
 .screen #price { margin-bottom: var(--s2); }
 
@@ -328,7 +327,7 @@ hr, .rule { border: 0; height: 2px; background: var(--line); margin: var(--s3) 0
 }
 .faction { display: flex; align-items: center; gap: var(--s1); }
 .faction img, .faction canvas { width: 28px; height: 28px; }
-.faction .n { font-family: var(--num-md); font-size: 22px; font-variant-numeric: tabular-nums; }
+.faction .n { font-family: var(--ui); font-size: 22px; font-weight: 500; font-variant-numeric: tabular-nums; }
 .faction.bolt  .n { color: var(--c-bolt); }
 .faction.rush  .n { color: var(--c-rush); }
 .faction.hoot  .n { color: var(--c-hoot); }
@@ -352,9 +351,9 @@ hr, .rule { border: 0; height: 2px; background: var(--line); margin: var(--s3) 0
   box-shadow: 4px 4px 0 0 var(--line);
 }
 #final .score-title {
-  font-family: var(--num-md);
+  font-family: var(--ui);
   font-size: var(--t-cap);
-  letter-spacing: .15em;
+  letter-spacing: .08em;
   text-transform: uppercase;
   color: var(--accent);
   margin-bottom: var(--s2);
@@ -363,9 +362,8 @@ hr, .rule { border: 0; height: 2px; background: var(--line); margin: var(--s3) 0
 }
 #final h2 { font-size: 26px; }
 #final p { margin: 6px 0; font-size: var(--t-body); color: var(--fg-2); }
-#final b { font-family: var(--num-md); font-weight: 400; color: var(--fg); font-variant-numeric: tabular-nums; }
-/* 榜单行：等宽数字右对齐排列，经典街机高分榜语言 */
-.scoreboard { font-family: var(--num-md); font-size: 18px; margin-top: var(--s2); }
+#final b { font-family: var(--ui); font-weight: 600; color: var(--fg); font-variant-numeric: tabular-nums; }
+.scoreboard { font-family: var(--ui); font-size: var(--t-lead); margin-top: var(--s2); }
 .scoreboard li {
   display: flex;
   justify-content: space-between;
@@ -379,8 +377,8 @@ hr, .rule { border: 0; height: 2px; background: var(--line); margin: var(--s3) 0
   margin-top: auto;
   padding-top: var(--s3);
   border-top: 2px solid var(--line);
-  font-size: var(--t-micro);
-  color: var(--fg-3);
+  font-size: var(--t-cap);
+  color: var(--fg-2);
   line-height: 1.7;
 }
 
@@ -405,9 +403,9 @@ hr, .rule { border: 0; height: 2px; background: var(--line); margin: var(--s3) 0
 .mobile #wait,
 .mobile #countdown,
 .mobile #social {
-  font-family: var(--num-sm);
-  font-size: var(--t-cap);
-  color: var(--fg-3);
+  font-family: var(--ui);
+  font-size: var(--t-body);
+  color: var(--fg-2);
   margin: 6px 0;
 }
 .mobile #wait { color: var(--fg-2); }
@@ -417,8 +415,9 @@ hr, .rule { border: 0; height: 2px; background: var(--line); margin: var(--s3) 0
   display: flex;
   align-items: center;
   gap: var(--s1);
-  font-family: var(--num-sm);
-  font-size: var(--t-cap);
+  font-family: var(--ui);
+  font-size: var(--t-body);
+  color: var(--fg);
   margin: var(--s2) 0;
 }
 .faction-hint img, .faction-hint canvas { width: 20px; height: 20px; }
@@ -465,25 +464,24 @@ hr, .rule { border: 0; height: 2px; background: var(--line); margin: var(--s3) 0
 #receipt dt, #receipt dd { display: inline; }
 #receipt dt {
   display: block;
-  font-family: var(--num-sm);
-  font-size: var(--t-micro);
-  letter-spacing: .1em;
-  text-transform: uppercase;
-  color: var(--fg-3);
+  font-family: var(--ui);
+  font-size: var(--t-cap);
+  letter-spacing: 0;
+  color: var(--fg-2);
   margin-top: var(--s2);
 }
 #receipt dd {
   display: block;
   margin: 2px 0 0;
-  font-family: var(--num-md);
+  font-family: var(--ui);
   font-size: 24px;
-  font-weight: 400;
+  font-weight: 500;
   font-variant-numeric: tabular-nums;
 }
 #receipt pre {
-  font-family: var(--num-sm);
-  font-size: 13px;
-  line-height: 1.8;
+  font-family: var(--ui);
+  font-size: var(--t-body);
+  line-height: 1.7;
   color: var(--fg-2);
   white-space: pre-wrap;
   word-break: break-word;
@@ -499,8 +497,9 @@ hr, .rule { border: 0; height: 2px; background: var(--line); margin: var(--s3) 0
 label {
   display: block;
   margin: var(--s3) 0;
-  font-size: var(--t-cap);
-  letter-spacing: .01em;
+  font-family: var(--ui);
+  font-size: var(--t-body);
+  letter-spacing: 0;
   color: var(--fg-2);
 }
 input:not([type="radio"]):not([type="checkbox"]),
@@ -530,11 +529,10 @@ fieldset {
   margin: var(--s4) 0;
 }
 legend {
-  font-family: var(--num-sm);
-  font-size: var(--t-micro);
-  letter-spacing: .1em;
-  text-transform: uppercase;
-  color: var(--fg-3);
+  font-family: var(--ui);
+  font-size: var(--t-cap);
+  letter-spacing: 0;
+  color: var(--fg-2);
   padding: 0 var(--s1);
 }
 fieldset label { margin: var(--s1) 0; color: var(--fg); font-size: var(--t-body); }
