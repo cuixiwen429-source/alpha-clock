@@ -66,6 +66,7 @@ export function getNetwork(): NetConfig {
 
 export interface Deployments {
   chainId: number;
+  deploymentBlock?: number;
   usdc: `0x${string}`;
   isMockUSDC: boolean;
   alphaClock: `0x${string}`;
@@ -97,7 +98,183 @@ export function resolveUsdc(net: NetConfig): `0x${string}` {
 
 // ──────────────────────────── ABI ────────────────────────────
 
+/** PRD v1 / shared API v1 对应的合约 ABI。 */
 export const ALPHA_ABI = [
+  {
+    type: "function",
+    name: "publish",
+    stateMutability: "nonpayable",
+    inputs: [
+      { name: "title", type: "string" },
+      { name: "previewURI", type: "string" },
+      { name: "contentHash", type: "bytes32" },
+      { name: "basePrice", type: "uint128" },
+      { name: "floorPrice", type: "uint128" },
+      { name: "halfLife", type: "uint32" },
+    ],
+    outputs: [{ name: "id", type: "uint256" }],
+  },
+  {
+    type: "function",
+    name: "buy",
+    stateMutability: "nonpayable",
+    inputs: [{ name: "id", type: "uint256" }],
+    outputs: [{ name: "paid", type: "uint128" }],
+  },
+  {
+    type: "function",
+    name: "claimFree",
+    stateMutability: "nonpayable",
+    inputs: [{ name: "id", type: "uint256" }],
+    outputs: [],
+  },
+  {
+    type: "function",
+    name: "recordX402",
+    stateMutability: "nonpayable",
+    inputs: [
+      { name: "id", type: "uint256" },
+      { name: "buyer", type: "address" },
+      { name: "price", type: "uint128" },
+    ],
+    outputs: [],
+  },
+  {
+    type: "function",
+    name: "openNow",
+    stateMutability: "nonpayable",
+    inputs: [{ name: "id", type: "uint256" }],
+    outputs: [],
+  },
+  {
+    type: "function",
+    name: "currentPrice",
+    stateMutability: "view",
+    inputs: [{ name: "id", type: "uint256" }],
+    outputs: [{ name: "", type: "uint128" }],
+  },
+  {
+    type: "function",
+    name: "priceAt",
+    stateMutability: "view",
+    inputs: [
+      { name: "id", type: "uint256" },
+      { name: "t", type: "uint64" },
+    ],
+    outputs: [{ name: "", type: "uint128" }],
+  },
+  {
+    type: "function",
+    name: "timeToFree",
+    stateMutability: "view",
+    inputs: [{ name: "id", type: "uint256" }],
+    outputs: [{ name: "", type: "uint64" }],
+  },
+  {
+    type: "function",
+    name: "isFree",
+    stateMutability: "view",
+    inputs: [{ name: "id", type: "uint256" }],
+    outputs: [{ name: "", type: "bool" }],
+  },
+  {
+    type: "function",
+    name: "accessOf",
+    stateMutability: "view",
+    inputs: [
+      { name: "id", type: "uint256" },
+      { name: "buyer", type: "address" },
+    ],
+    outputs: [
+      {
+        name: "access",
+        type: "tuple",
+        components: [
+          { name: "at", type: "uint64" },
+          { name: "price", type: "uint128" },
+        ],
+      },
+    ],
+  },
+  {
+    type: "function",
+    name: "signalCount",
+    stateMutability: "view",
+    inputs: [],
+    outputs: [{ name: "", type: "uint256" }],
+  },
+  {
+    type: "function",
+    name: "getSignal",
+    stateMutability: "view",
+    inputs: [{ name: "id", type: "uint256" }],
+    outputs: [
+      {
+        name: "v",
+        type: "tuple",
+        components: [
+          { name: "publisher", type: "address" },
+          { name: "publishedAt", type: "uint64" },
+          { name: "basePrice", type: "uint128" },
+          { name: "floorPrice", type: "uint128" },
+          { name: "halfLife", type: "uint32" },
+          { name: "forcedOpen", type: "bool" },
+          { name: "contentHash", type: "bytes32" },
+          { name: "title", type: "string" },
+          { name: "previewURI", type: "string" },
+          { name: "price", type: "uint128" },
+          { name: "freeNow", type: "bool" },
+        ],
+      },
+    ],
+  },
+  {
+    type: "event",
+    name: "Published",
+    inputs: [
+      { name: "id", type: "uint256", indexed: true },
+      { name: "publisher", type: "address", indexed: true },
+      { name: "title", type: "string", indexed: false },
+      { name: "basePrice", type: "uint128", indexed: false },
+      { name: "floorPrice", type: "uint128", indexed: false },
+      { name: "halfLife", type: "uint32", indexed: false },
+      { name: "contentHash", type: "bytes32", indexed: false },
+      { name: "at", type: "uint64", indexed: false },
+    ],
+  },
+  {
+    type: "event",
+    name: "Bought",
+    inputs: [
+      { name: "id", type: "uint256", indexed: true },
+      { name: "buyer", type: "address", indexed: true },
+      { name: "price", type: "uint128", indexed: false },
+      { name: "elapsed", type: "uint64", indexed: false },
+      { name: "viaX402", type: "bool", indexed: false },
+    ],
+  },
+  {
+    type: "event",
+    name: "Claimed",
+    inputs: [
+      { name: "id", type: "uint256", indexed: true },
+      { name: "buyer", type: "address", indexed: true },
+      { name: "elapsed", type: "uint64", indexed: false },
+    ],
+  },
+  {
+    type: "event",
+    name: "Opened",
+    inputs: [
+      { name: "id", type: "uint256", indexed: true },
+      { name: "by", type: "address", indexed: true },
+      { name: "at", type: "uint64", indexed: false },
+    ],
+  },
+] as const;
+
+/** 仅用于开发期兼容仓库当前旧合约；新部署一律使用 ALPHA_ABI。 */
+export const ALPHA_LEGACY_ABI = [
   {
     type: "function",
     name: "publish",

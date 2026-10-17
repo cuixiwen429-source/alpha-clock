@@ -15,7 +15,10 @@
     "serve": "tsx src/server/alpha-api.ts",
     "facilitator:local": "tsx src/server/local-facilitator.ts",
     "demo": "bash scripts/demo-local.sh",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test": "tsx --test src/**/*.test.ts",
+    "test:contract": "tsx src/testing/contract-check.ts",
+    "check": "npm run typecheck && npm test && npm run test:contract"
   },
   "dependencies": {
     "@x402/axios": "^2.28.0",
@@ -37,6 +40,6 @@
     "typescript": "^5.9.0"
   },
   "engines": {
-    "node": ">=20"
+    "node": ">=22"
   }
 }

@@ -38,13 +38,13 @@ async function main() {
 
   const who = account.address as Address;
 
-  const already = await pub.readContract({
+  const existingAccess = await pub.readContract({
     address: dep.alphaClock,
     abi: ALPHA_ABI,
-    functionName: "hasAccess",
+    functionName: "accessOf",
     args: [BigInt(signalId), who],
   });
-  if (already) {
+  if (existingAccess.at > 0n) {
     console.log(`  你已经买过 #${signalId} 了`);
     return;
   }
@@ -101,20 +101,14 @@ async function main() {
   const rc = await pub.waitForTransactionReceipt({ hash });
   const ms = Date.now() - t0;
 
-  const paid = await pub.readContract({
+  const access = await pub.readContract({
     address: dep.alphaClock,
     abi: ALPHA_ABI,
-    functionName: "paidPrice",
+    functionName: "accessOf",
     args: [BigInt(signalId), who],
   });
-  const buyCount = await pub.readContract({
-    address: dep.alphaClock,
-    abi: ALPHA_ABI,
-    functionName: "accessCount",
-    args: [BigInt(signalId)],
-  });
 
-  console.log(`  ✔ 成交  ${money(paid)}  第 ${buyCount} 个买家  确认 ${ms}ms  tx=${hash.slice(0, 12)}`);
+  console.log(`  ✔ 成交  ${money(access.price)}  确认 ${ms}ms  tx=${hash.slice(0, 12)}`);
   console.log(`     链上确认区块 ${rc.blockNumber} —— 这一笔就是"你比别人早看到了多久"的价格`);
   await sleep(10);
 }

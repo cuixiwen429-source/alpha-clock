@@ -12,3 +12,4 @@ backend/contracts/broadcast/*/31337/
 # 运行时
 *.log
 events.ndjson
+backend/.runtime/
